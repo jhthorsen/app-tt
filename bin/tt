@@ -21,6 +21,7 @@ sub _say { printf shift . "\n", @_ }
 option str => description => 'Description for an event',            alias => 'd';
 option str => tag         => 'Tags for an event',                   alias => 't', n_of => '@';
 option str => project     => 'Project name. Normally autodetected', alias => 'p';
+option str => group_by    => 'Group log output: --group-by day',    alias => 'g';
 
 documentation __FILE__;
 version '0.01';
@@ -124,6 +125,7 @@ sub action_log {
   my $n_events   = 0;
   my $tags       = join ',', @{$self->tag};
   my @project_re = map {qr{^$_\b}} split /,/, $self->project || '.+';
+  my $group_by   = sprintf '_group_by_%s', $self->group_by || 'nothing';
   my ($interval, $offset, $pl, $path, $when, $fill) = ('', 0, 0);
   my @log;
 
@@ -160,6 +162,10 @@ sub action_log {
       $seconds += $event->{seconds};
     }
   }, $path;
+
+  if ($self->can($group_by)) {
+    ($pl, @log) = $self->$group_by(@log);
+  }
 
   for my $event (@log) {
     my $start = $event->{start};
@@ -354,6 +360,32 @@ sub _get_previous_event {
   $trc_file =~ s!\s*$!!;
   return $trc_file, {} unless -r $trc_file;
   return $trc_file, decode_json(_slurp($trc_file));    # slurp $ROOT/2015/08/20150827-085643_app_tt.trc
+}
+
+sub _group_by_day {
+  my $self = shift;
+  my $pl = 0;
+  my (%log, @log);
+
+  for my $e (@_) {
+    my $k = $e->{start}->ymd;
+    $log{$k} ||= $e;
+    $log{$k}{seconds} += $e->{seconds};
+    $log{$k}{_project}{$e->{project}} = 1;
+    $log{$k}{_tags}{$_} = 1 for @{$e->{tags}};
+  }
+
+  @log = map {
+    my $p = join ', ', keys %{$_->{_project}};
+    $pl = length $p if $pl < length $p;
+    +{
+      %$_,
+      project => $p,
+      tags => [keys %{$_->{_tags}}],
+    };
+  } map { $log{$_} } sort keys %log;
+
+  return $pl, @log;
 }
 
 sub _help_for_analyze {
