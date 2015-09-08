@@ -241,7 +241,16 @@ sub action_start {
     return 1;    # Operation not permitted
   }
 
-  $self->_stop_previous({start => 1});
+  # change start time on current event
+  if ($self->{custom_now}) {
+    my ($trc_file, $e) = $self->_get_previous_event;
+    if ($e->{start} and !$e->{stop}) {
+      $event = $e;
+      $event->{start} = $self->now->datetime;
+    }
+  }
+
+  $self->_stop_previous({start => 1}) unless $event->{start};
   $self->_add_event_info($event);
   make_path(dirname($trc_file));
   _spurt(encode_json($event) => $trc_file);
@@ -543,6 +552,7 @@ app {
   }
   if (my ($hm) = grep {/^\d+:\d+$/} @_) {
     $hm =~ /^(\d+):(\d+)$/;
+    $self->{custom_now} = $hm;
     $self->{now} = $self->_tp(H => $1, M => $2);
   }
 
