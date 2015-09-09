@@ -18,7 +18,17 @@ but it has (in my humble opinion) a simpler interface and easier to install.
 
 =head1 SYNOPSIS
 
-=head2 Basic usage
+The application is built up by specifying an an L<action|/ACTIONS> and
+optional arguments.
+
+  $ tt <action> [options]
+  $ tt help <action>
+  $ tt <action> -h
+
+Available actions: L</analyze>, L</edit>, L</log>, L</register>, L</start>,
+L</status> (default) and L</stop>.
+
+Basic usage;
 
   # Start to track time
   $ cd $HOME/git/my-project
@@ -26,19 +36,90 @@ but it has (in my humble opinion) a simpler interface and easier to install.
   # Work, work, work, cd ..., do other stuff
   $ tt stop
 
-=head2 A bit more complex
+A bit more complex:
 
   # Start to work on an event and add a tag
   $ tt start -t ISSUE-999 -p some-project-at-work
   # Add another tag to the same event and add a --comment
   $ tt stop -t GITHUB-1005 "Today I was mostly in meetings"
 
-=head2 Available actions
+=head1 ACTIONS
 
-  $ tt {analyze,log,start,stop,status,register}
+Each action can tak C<-h> for more details. Example:
+
   $ tt start -h
 
-Each action takes "-h" for more details.
+=head2 analyze
+
+This action can analyze all the git repos in a directory and print what time
+you started/stopped working on a set of repos grouped per day. The output
+is suitable for "tt register".
+
+  $ cd ..                  # one step up from the current git-project
+  $ tt analyze             # default is last month
+  $ tt analyze "last week" # analyze git reflog from last week
+  $ tt analyze 2015-07-01  # analyze git reflog since a given date
+
+=head2 edit
+
+This command can be used to rewrite all the log entries. See source
+code before running this action. (Internals might change)
+
+DISCLAIMER! Backup your files before running this action!
+
+  $ cat rewrite.pl | tt edit
+  # verify output, and then run:
+  $ cat rewrite.pl | tt edit --no-dry-run
+
+=head2 log
+
+This command will report how much time you have spent on various
+events.
+
+  $ tt log         # this month
+  $ tt log -2      # two months ago
+  $ tt log year    # log for year
+  $ tt log year -1 # last year
+  $ tt log -p foo  # Filter by project name
+
+=head2 register
+
+This command is used to import data from other sources. "project-name" default to
+"-p" or current git project, "some description" default to "-d" and tags can be
+specified by -t foo -t bar
+
+  $ tt register 2010-01-21T18:50:00  2010-01-21T19:20:00 "project-name" "some description" "foo,bar"
+  $ echo "2010-01-21T18:50:00\t2010-01-21T19:20:00\tproject-name\tsome description\tfoo,bar" | tt register
+
+=head2 start
+
+This command will start tracking a new event. It will also stop the
+current event if any event is in process. This action takes the
+"-p" and "-t" switches. "-p" (project) is not required if you start
+from a git repository.
+
+  # Specify a tag and custom project name
+  $ tt start -t ISSUE-999 some-project-name
+
+  # Started working at 08:00 instead of now
+  $ tt start 08:00
+
+=head2 status
+
+This is the default action and will return the current status:
+Are you working on something or not?
+
+  $ tt status
+
+=head2 stop
+
+This command will stop tracking the current event.
+
+  # Add more tags to the current event
+  $ tt stop -t meetings -t not_fun
+
+  # Stop working at 16:00 instead of now
+  $ tt stop 16:00
 
 =cut
 

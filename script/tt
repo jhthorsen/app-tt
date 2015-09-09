@@ -23,7 +23,7 @@ option str => tag         => 'Tags for an event',                   alias => 't'
 option str => project     => 'Project name. Normally autodetected', alias => 'p';
 option str => group_by    => 'Group log output: --group-by day',    alias => 'g';
 
-documentation __FILE__;
+documentation 'App::tt';
 version '0.01';
 
 $SIG{__DIE__} = sub { Carp::confess($_[0]) }
@@ -100,23 +100,28 @@ sub action_edit {
 }
 
 sub action_help {
-  my $self   = shift;
-  my $for    = shift || 'all';
-  my $method = "_help_for_$for";
+  my $self = shift;
+  my $for = shift || 'app';
+  my @help;
 
-  if ($for eq 'all') {
+  if ($for eq 'app') {
     $self->_script->print_help;
-    for (qw( log status start stop )) {
-      $method = "_help_for_$_";
-      print "\n---\nHelp for $_:\n";
-      print $self->$method;
-    }
-  }
-  else {
-    return $self->_script->print_help unless $self->can($method);
-    print $self->$method(@_);
     return 0;
   }
+
+  require App::tt;
+  open my $POD, '<', $INC{'App/tt.pm'} or die "Cannot open App/tt.pm: $!";
+  while (<$POD>) {
+    push @help, $_ if /^=head2 $for/ ... /^=(head|cut)/;
+  }
+
+  # remove =head and =cut lines
+  shift @help;
+  pop @help;
+
+  die "Could not find help for $for.\n" unless @help;
+  print @help;
+  return 0;
 }
 
 sub action_log {
@@ -198,7 +203,7 @@ sub action_register {
     return 0;
   }
 
-  die $self->_help_for_register unless $start and $stop and $project;
+  return $self->action_help('register') unless $start and $stop and $project;
 
   $description ||= '';
   $tags        ||= '';
@@ -364,7 +369,7 @@ sub _get_previous_event {
 
 sub _group_by_day {
   my $self = shift;
-  my $pl = 0;
+  my $pl   = 0;
   my (%log, @log);
 
   for my $e (@_) {
@@ -378,104 +383,10 @@ sub _group_by_day {
   @log = map {
     my $p = join ', ', keys %{$_->{_project}};
     $pl = length $p if $pl < length $p;
-    +{
-      %$_,
-      project => $p,
-      tags => [keys %{$_->{_tags}}],
-    };
+    +{%$_, project => $p, tags => [keys %{$_->{_tags}}],};
   } map { $log{$_} } sort keys %log;
 
   return $pl, @log;
-}
-
-sub _help_for_analyze {
-  <<'HERE';
-This action can analyze all the git repos in a directory and print what time
-you started/stopped working on a set of repos grouped per day. The output
-is suitable for "tt register".
-
-$ cd ..                  # one step up from the current git-project
-$ tt analyze             # default is last month
-$ tt analyze "last week" # analyze git reflog from last week
-$ tt analyze 2015-07-01  # analyze git reflog since a given date
-HERE
-}
-
-sub _help_for_edit {
-  <<'HERE';
-
-This command can be used to rewrite all the log entries. See source
-code before running this action. (Internals might change)
-
-DISCLAIMER! Backup your files before running this action!
-
-$ cat rewrite.pl | tt edit
-# verify output, and then run:
-$ cat rewrite.pl | tt edit --no-dry-run
-HERE
-}
-
-sub _help_for_log {
-  <<'HERE';
-
-This command will report how much time you have spent on various
-events.
-
-$ tt log         # this month
-$ tt log -2      # two months ago
-$ tt log year    # log for year
-$ tt log year -1 # last year
-$ tt log -p foo  # Filter by project name
-HERE
-}
-
-sub _help_for_register {
-  <<'HERE';
-
-This command is used to import data from other sources. "project-name" default to
-"-p" or current git project, "some description" default to "-d" and tags can be
-specified by -t foo -t bar
-
-$ tt register 2010-01-21T18:50:00  2010-01-21T19:20:00 "project-name" "some description" "foo,bar"
-$ echo "2010-01-21T18:50:00\t2010-01-21T19:20:00\tproject-name\tsome description\tfoo,bar" | tt register
-HERE
-}
-
-sub _help_for_start {
-  <<'HERE';
-
-This command will start tracking a new event. It will also stop the
-current event if any event is in process. This action takes the
-"-p" and "-t" switches. "-p" (project) is not required if you start
-from a git repository.
-
-# Specify a tag and custom project name
-$ tt start -t ISSUE-999 some-project-name
-
-# Started working at 08:00 instead of now
-$ tt start 08:00
-HERE
-}
-
-sub _help_for_status {
-  <<'HERE';
-Get the current status: Are you working on something or not?
-
-$ tt status
-HERE
-}
-
-sub _help_for_stop {
-  <<'HERE';
-
-This command will stop tracking the current event.
-
-# Add more tags to the current event
-$ tt stop -t meetings -t not_fun
-
-# Stop working at 16:00 instead of now
-$ tt stop 16:00
-HERE
 }
 
 sub _hms_duration {
@@ -588,57 +499,6 @@ app {
     $self->{now} = $self->_tp(H => $1, M => $2);
   }
 
-  return $self->action_help('app') unless $self->can($action);
+  return $self->action_help unless $self->can($action);
   return $self->$action(@_);
 };
-
-=head1 NAME
-
-tt - Time tracking utility
-
-=head1 SYNOPSIS
-
-Basic usage:
-
-  # Start to track time
-  $ cd $HOME/git/my-project
-  $ tt start
-  # Work, work, work, cd ..., do other stuff
-  $ tt stop
-
-A bit more complex:
-
-  # Start to work on an event and add a tag
-  $ tt start -t ISSUE-999 -p some-project-at-work
-  # Add another tag to the same event and add a --comment
-  $ tt stop -t GITHUB-1005 "Today I was mostly in meetings"
-
-Available actions: (each action takes "-h" for more details)
-
-  $ tt {analyze,log,start,stop,status,register}
-  $ tt start -h
-
-=head1 DISCLAIMER
-
-This code is not tested.
-
-=head1 AUTHOR
-
-Jan Henning Thorsen - jhthorsen@cpan.org
-
-=cut
-
-__END__
-cat <<HERE | sqlite3 ~/Downloads/hamster.db -separator $'\t' | bin/tt register
-SELECT f.start_time,f.end_time,a.name,f.description,group_concat(t.name)
-FROM facts f
-LEFT JOIN activities a ON a.id              = f.activity_id
-LEFT JOIN fact_tags    ON fact_tags.fact_id = f.id
-LEFT JOIN tags t       ON t.id              = fact_tags.tag_id
-GROUP BY fact_tags.fact_id;
-HERE
-
-cat <<HERE | sqlite3 ~/Downloads/hamster.db -separator $'\t' | bin/tt register
-SELECT f.start_time,f.end_time,a.name,f.description
-FROM facts f LEFT JOIN activities a ON a.id = f.activity_id;
-HERE
