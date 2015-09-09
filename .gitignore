@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 ~$
 *.bak
 *.old
@@ -14,3 +13,4 @@
 /META*
 /MYMETA*
 /pm_to_blib
+/t/.TimeTracker*

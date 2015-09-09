@@ -12,11 +12,8 @@ use File::HomeDir;
 use File::Path 'make_path';
 use File::Spec;
 use JSON::XS;
-use Term::ANSIColor;
 use Time::Piece;
 use constant DEBUG => $ENV{APP_TT_DEBUG} || 0;
-
-sub _say { printf shift . "\n", @_ }
 
 option str => description => 'Description for an event',            alias => 'd';
 option str => tag         => 'Tags for an event',                   alias => 't', n_of => '@';
@@ -24,12 +21,12 @@ option str => project     => 'Project name. Normally autodetected', alias => 'p'
 option str => group_by    => 'Group log output: --group-by day',    alias => 'g';
 
 documentation 'App::tt';
-version '0.01';
+version 'App::tt';
 
 $SIG{__DIE__} = sub { Carp::confess($_[0]) }
   if DEBUG;
 
-sub action_analyze {
+sub cmd_analyze {
   my $self      = shift;
   my $recursive = ref $_[0] ? shift : undef;
   my $since     = shift || 'last month';
@@ -58,21 +55,25 @@ sub action_analyze {
   else {
     opendir(my $DH, $dir) or die "$dir: $!";
     while (my $i = readdir $DH) {
-      $self->action_analyze($log, $since, File::Spec->catdir($dir, $i)) if -d File::Spec->catdir($dir, $i, '.git');
+      $self->cmd_analyze($log, $since, File::Spec->catdir($dir, $i)) if -d File::Spec->catdir($dir, $i, '.git');
     }
   }
 
   for my $event (sort { $a->{start} <=> $b->{start} } values %$log) {
     my $tags = join ',', keys %{$event->{tags}};
-    _say "%s\t%s\t%s\t%s\t%s", $event->{start}->datetime, $event->{stop}->datetime, $event->{project},
-      $event->{description}, $tags;
+    $self->_say(
+      "%s\t%s\t%s\t%s\t%s",
+      $event->{start}->datetime,
+      $event->{stop}->datetime,
+      $event->{project}, $event->{description}, $tags
+    );
   }
 }
 
-sub action_edit {
+sub cmd_edit {
   my $self = shift;
   my $doit = grep {/^--no-dry-run$/} @_;
-  my $dir  = readlink($self->root) || $self->root;
+  my $dir  = readlink($self->_root) || $self->_root;
   my $code = '';
 
   $code .= $_ while <STDIN>;
@@ -99,7 +100,7 @@ sub action_edit {
   return 0;
 }
 
-sub action_help {
+sub cmd_help {
   my $self = shift;
   my $for = shift || 'app';
   my @help;
@@ -120,11 +121,11 @@ sub action_help {
   pop @help;
 
   die "Could not find help for $for.\n" unless @help;
-  print @help;
+  $self->_say("@help");
   return 0;
 }
 
-sub action_log {
+sub cmd_log {
   my $self       = shift;
   my $seconds    = 0;
   my $n_events   = 0;
@@ -141,12 +142,12 @@ sub action_log {
   }
 
   if ($interval eq 'year') {
-    $when = $self->_tp(Y => $self->now->year + $offset, m => 1, d => 1);
-    $path = File::Spec->catdir($self->root, $when->year);
+    $when = $self->_tp(Y => $self->_now->year + $offset, m => 1, d => 1);
+    $path = File::Spec->catdir($self->_root, $when->year);
   }
   else {
-    $when = $self->_tp(m => $self->now->mon + $offset, d => 1);
-    $path = File::Spec->catdir($self->root, $when->year, sprintf '%02s', $when->mon);
+    $when = $self->_tp(m => $self->_now->mon + $offset, d => 1);
+    $path = File::Spec->catdir($self->_root, $when->year, sprintf '%02s', $when->mon);
   }
 
   -d $path and find {
@@ -174,22 +175,24 @@ sub action_log {
 
   for my $event (@log) {
     my $start = $event->{start};
-    print color('red') if $start->wday == 1 or $start->wday == 7;
-    printf(
-      "%3s %2s %02s:%02s  %5s  %-${pl}s  %s%s\n",
+    $self->_say(
+      "%3s %2s %02s:%02s  %5s  %-${pl}s  %s%s",
       $start->month, $start->mday, $start->hour, $start->minute,
       $self->_hms_duration($event->{seconds}, 'hm'),
       $event->{project} || '---',
       join(',', @{$event->{tags}}),
-      color('reset')
     );
   }
 
-  warn sprintf "\nTotal for %s events since %s: %s\n", $n_events, join(' ', $when->month, $when->year),
-    $self->_hms_duration($seconds, 'hms');
+  $self->_diag(
+    "\nTotal for %s events since %s: %s",
+    $n_events,
+    join(' ', $when->month, $when->year),
+    $self->_hms_duration($seconds, 'hms')
+  );
 }
 
-sub action_register {
+sub cmd_register {
   my ($self, $start, $stop, $project, $description, $tags) = @_;
   my ($trc_file, %event);
 
@@ -198,12 +201,12 @@ sub action_register {
       next if /^\s*#/;
       chomp;
       my @args = split /\t/;
-      $self->action_register(@args) if $args[0] and $args[1] and $args[2];
+      $self->cmd_register(@args) if $args[0] and $args[1] and $args[2];
     }
     return 0;
   }
 
-  return $self->action_help('register') unless $start and $stop and $project;
+  return $self->cmd_help('register') unless $start and $stop and $project;
 
   $description ||= '';
   $tags        ||= '';
@@ -220,35 +223,35 @@ sub action_register {
   );
 
   if (-e $trc_file) {
-    warn "Already registered: $start $stop $project $description $tags\n";
+    $self->_diag("Already registered: $start $stop $project $description $tags");
     return 1;
   }
 
   $self->_fill_duration(\%event);
 
   if ($event{seconds} < 300) {
-    warn "Skipping $project - $start - $stop. Too short duration ($event{duration})\n";
+    $self->_diag("Skipping $project - $start - $stop. Too short duration ($event{duration})");
     return 1;
   }
 
   make_path(dirname($trc_file));
   _spurt(encode_json(\%event) => $trc_file);
-  _say 'Registered "%s" at %s with duration %s', @event{qw( project start duration )};
+  $self->_say('Registered "%s" at %s with duration %s', @event{qw( project start duration )});
 }
 
-sub action_start {
+sub cmd_start {
   my ($self, @args) = @_;
   my $event = {};
   my $trc_file;
 
   $self->project($args[0]) if $args[0] and $args[0] =~ /^[A-Za-z0-9-]+$/;
   $self->project(basename(Cwd::getcwd)) if -d '.git' and !$self->project;
-  $trc_file = $self->_trc_path($self->project, $self->now);
+  $trc_file = $self->_trc_path($self->project, $self->_now);
 
   warn "[APP_TT] start $trc_file\n" if DEBUG;
 
   if (!$self->project) {
-    warn "Cannot 'start' with unknown project name. Are you sure you are inside a git project?\n";
+    $self->_diag("Cannot 'start' with unknown project name. Are you sure you are inside a git project?");
     return 1;    # Operation not permitted
   }
 
@@ -257,7 +260,7 @@ sub action_start {
     my ($trc_file, $e) = $self->_get_previous_event;
     if ($e->{start} and !$e->{stop}) {
       $event = $e;
-      $event->{start} = $self->now->datetime;
+      $event->{start} = $self->_now->datetime;
     }
   }
 
@@ -265,48 +268,33 @@ sub action_start {
   $self->_add_event_info($event);
   make_path(dirname($trc_file));
   _spurt(encode_json($event) => $trc_file);
-  _spurt($trc_file => File::Spec->catfile($self->root, 'previous'));
-  _say 'Started working on project "%s" at %s.', $event->{project}, $self->now->hms(':');
+  _spurt($trc_file => File::Spec->catfile($self->_root, 'previous'));
+  $self->_say('Started working on project "%s" at %s.', $event->{project}, $self->_now->hms(':'));
 }
 
-sub action_stop {
-  my ($self, @args) = @_;
-  return $self->_stop_previous;
+sub cmd_stop {
+  shift->_stop_previous;
 }
 
-sub action_status {
+sub cmd_status {
   my $self = shift;
   my ($trc_file, $event) = $self->_get_previous_event;
 
   warn "[APP_TT] status $trc_file\n" if DEBUG;
 
   if (!$event->{start}) {
-    _say 'No event is being tracked.';
+    $self->_say('No event is being tracked.');
     return 3;    # No such process
   }
   elsif ($event->{stop}) {
-    _say 'Stopped working on "%s" at %s after %s', $event->{project}, $event->{stop}, $event->{duration};
+    $self->_say('Stopped working on "%s" at %s after %s', $event->{project}, $event->{stop}, $event->{duration});
     return 3;    # No such process
   }
   else {
-    my $duration = $self->now - $self->_from_iso_8601($event->{start}) + $self->tzoffset;
-    _say 'Been working on "%s", for %s', $event->{project}, $self->_hms_duration($duration, 'hms');
+    my $duration = $self->_now - $self->_from_iso_8601($event->{start}) + $self->_tzoffset;
+    $self->_say('Been working on "%s", for %s', $event->{project}, $self->_hms_duration($duration, 'hms'));
     return 0;
   }
-}
-
-sub now { shift->{now} ||= localtime }
-
-sub root {
-  shift->{root} ||= $ENV{TIMETRACKER_HOME} || do {
-    my $home = File::HomeDir->my_home || File::Spec->curdir;
-    File::Spec->catdir($home, '.TimeTracker');
-  };
-}
-
-sub tzoffset {
-  my $self = shift;
-  $self->{tzoffset} ||= $self->now->tzoffset;
 }
 
 sub _add_event_info {
@@ -316,7 +304,7 @@ sub _add_event_info {
   $event->{__CLASS__} ||= 'App::TimeTracker::Data::Task';
   $event->{project}   ||= $self->project;
   $event->{seconds}   ||= undef;
-  $event->{start}     ||= $self->now->datetime;
+  $event->{start}     ||= $self->_now->datetime;
   $event->{user}      ||= scalar(getpwuid $<);
   $event->{tags}      ||= [];
 
@@ -325,6 +313,18 @@ sub _add_event_info {
   for my $t (ref $tags ? @$tags : $tags) {
     push @{$event->{tags}}, $t;
   }
+}
+
+sub _diag {
+  my ($self, $format) = (shift, shift);
+  warn "$format\n" unless @_;
+  warn sprintf "$format\n", @_;
+}
+
+sub _say {
+  my ($self, $format) = (shift, shift);
+  print "$format\n" unless @_;
+  print sprintf "$format\n", @_;
 }
 
 sub _fill_duration {
@@ -356,7 +356,7 @@ sub _from_iso_8601 {
 
 sub _get_previous_event {
   my $self = shift;
-  my $trc_file = File::Spec->catfile($self->root, 'previous');
+  my $trc_file = File::Spec->catfile($self->_root, 'previous');
 
   warn "[APP_TT] _get_previous_event $trc_file\n" if DEBUG;
 
@@ -404,6 +404,20 @@ sub _hms_duration {
   return sprintf '%sh %sm %ss', $hours, $minutes, $seconds;
 }
 
+sub _now { shift->{now} ||= localtime }
+
+sub _root {
+  shift->{root} ||= $ENV{TIMETRACKER_HOME} || do {
+    my $home = File::HomeDir->my_home || File::Spec->curdir;
+    File::Spec->catdir($home, '.TimeTracker');
+  };
+}
+
+sub _tzoffset {
+  my $self = shift;
+  $self->{tzoffset} ||= $self->_now->tzoffset;
+}
+
 # From Mojo::Util
 sub _slurp {
   my $path = shift;
@@ -427,11 +441,11 @@ sub _stop_previous {
 
   if (!$event->{start} or $event->{stop}) {
     return 0 if $args->{start};
-    warn "No previous event to stop.\n";
+    $self->_diag("No previous event to stop.");
     return 3;    # No such process
   }
 
-  my $duration = $self->now - $self->_from_iso_8601($event->{start}) + $self->tzoffset;
+  my $duration = $self->_now - $self->_from_iso_8601($event->{start}) + $self->_tzoffset;
 
   # Probably some invalid timestamp was given as input
   if ($duration->seconds < 0) {
@@ -440,25 +454,27 @@ sub _stop_previous {
 
   $event->{duration} = $self->_hms_duration($duration);
   $event->{seconds}  = $duration->seconds;
-  $event->{stop}     = $self->now->datetime;
+  $event->{stop}     = $self->_now->datetime;
 
   if ($event->{seconds} <= 300) {
-    _say 'Dropping log event for "%s" since worked less than five minutes.', $event->{project};
+    $self->_say('Dropping log event for "%s" since worked less than five minutes.', $event->{project});
     unlink $trc_file or die "rm $trc_file: $!";
+    return 52;
   }
   else {
     $self->_add_event_info($event);
     _spurt(encode_json($event) => $trc_file);
-    _say 'Stopped working on "%s" after %s', $event->{project}, $self->_hms_duration($duration, 'hms');
+    $self->_say('Stopped working on "%s" after %s', $event->{project}, $self->_hms_duration($duration, 'hms'));
+    return 0;
   }
 }
 
 sub _tp {
   my ($self, %t) = @_;
 
-  $t{Y} ||= $self->now->year;
-  $t{m} ||= $self->now->mon;
-  $t{d} ||= $self->now->mday;
+  $t{Y} ||= $self->_now->year;
+  $t{m} ||= $self->_now->mon;
+  $t{d} ||= $self->_now->mday;
   $t{H} ||= 0;
   $t{M} ||= 0;
   $t{S} ||= 0;
@@ -479,15 +495,15 @@ sub _trc_path {
   $project =~ s!\W!_!g;
   $file = sprintf '%s-%s_%s.trc', $t->ymd(''), $t->hms(''), $project;
 
-  return File::Spec->catfile($self->root, $t->year, $month, $file);
+  return File::Spec->catfile($self->_root, $t->year, $month, $file);
 }
 
 app {
   my $self = shift;
-  my $action = sprintf 'action_%s', shift || 'status';
+  my $action = sprintf 'cmd_%s', shift || 'status';
 
   if ($ENV{APP_TT_HELP}) {
-    return $self->action_help($ENV{APP_TT_HELP});
+    return $self->cmd_help($ENV{APP_TT_HELP});
   }
   if (!$self->description) {
     my ($description) = grep {/^\w\S*\s/} @_;
@@ -499,6 +515,6 @@ app {
     $self->{now} = $self->_tp(H => $1, M => $2);
   }
 
-  return $self->action_help unless $self->can($action);
+  return $self->cmd_help unless $self->can($action);
   return $self->$action(@_);
 };
