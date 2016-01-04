@@ -1,4 +1,8 @@
 Revision history for perl distribution App-tt
 
 0.01 Not Released
- - Started project
+ - Add action "analyze"
+ - Add action "log"
+ - Add action "register"
+ - Add action "start" and "stop"
+ - Add action "status"
