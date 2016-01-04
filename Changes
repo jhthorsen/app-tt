@@ -1,6 +1,6 @@
 Revision history for perl distribution App-tt
 
-0.01 Not Released
+0.01 2016-01-04T08:28:38+0100
  - Add action "analyze"
  - Add action "log"
  - Add action "register"
