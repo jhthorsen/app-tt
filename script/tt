@@ -176,7 +176,7 @@ sub cmd_log {
   for my $event (@log) {
     my $start = $event->{start};
     $self->_say(
-      "%3s %2s %02s:%02s  %5s  %-${pl}s  %s%s",
+      "%3s %2s %02s:%02s  %5s  %-${pl}s  %s",
       $start->month, $start->mday, $start->hour, $start->minute,
       $self->_hms_duration($event->{seconds}, 'hm'),
       $event->{project} || '---',
