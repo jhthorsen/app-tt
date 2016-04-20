@@ -324,7 +324,7 @@ sub _diag {
 sub _say {
   my ($self, $format) = (shift, shift);
   print "$format\n" unless @_;
-  print sprintf "$format\n", @_;
+  print sprintf "$format\n", @_ if @_;
 }
 
 sub _fill_duration {
