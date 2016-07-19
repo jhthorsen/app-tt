@@ -88,8 +88,8 @@ This command is used to import data from other sources. "project-name" default t
 "-p" or current git project, "some description" default to "-d" and tags can be
 specified by -t foo -t bar
 
-  $ tt register 2010-01-21T18:50:00  2010-01-21T19:20:00 "project-name" "some description" "foo,bar"
-  $ echo "2010-01-21T18:50:00\t2010-01-21T19:20:00\tproject-name\tsome description\tfoo,bar" | tt register
+  $ tt register 2016-06-28T09:00:00 2016-06-28T17:00:00 "project-name" "some description" "foo,bar"
+  $ echo "2016-06-28T09:00:00\t2016-06-28T17:00:00\tproject-name\tsome description\tfoo,bar" | tt register
 
 =head2 start
 
