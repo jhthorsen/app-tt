@@ -1,5 +1,8 @@
 Revision history for perl distribution App-tt
 
+0.02 Not Released
+ - Fix "register" help output
+
 0.02 2016-07-19T11:02:15+0200
  - Fix double printing of messages
  - Fix uninitialized warnings

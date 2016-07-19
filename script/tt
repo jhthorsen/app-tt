@@ -114,7 +114,7 @@ sub cmd_help {
   require App::tt;
   open my $POD, '<', $INC{'App/tt.pm'} or die "Cannot open App/tt.pm: $!";
   while (<$POD>) {
-    s/\b2016-06-28(T\d+:)/$today$1/;    # make "register" command easier to copy/paste
+    s/\b2016-06-28(T\d+:)/$today$1/g;    # make "register" command easier to copy/paste
     push @help, $_ if /^=head2 $for/ ... /^=(head|cut)/;
   }
 
