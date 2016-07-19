@@ -2,7 +2,7 @@ NAME
     App::tt - Time tracking application
 
 VERSION
-    0.01
+    0.02
 
 DESCRIPTION
     App::tt is an application that can track how much time you spend on an
@@ -77,8 +77,8 @@ ACTIONS
     default to "-p" or current git project, "some description" default to
     "-d" and tags can be specified by -t foo -t bar
 
-      $ tt register 2010-01-21T18:50:00  2010-01-21T19:20:00 "project-name" "some description" "foo,bar"
-      $ echo "2010-01-21T18:50:00\t2010-01-21T19:20:00\tproject-name\tsome description\tfoo,bar" | tt register
+      $ tt register 2016-06-28T09:00:00 2016-06-28T17:00:00 "project-name" "some description" "foo,bar"
+      $ echo "2016-06-28T09:00:00\t2016-06-28T17:00:00\tproject-name\tsome description\tfoo,bar" | tt register
 
   start
     This command will start tracking a new event. It will also stop the

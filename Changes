@@ -1,5 +1,10 @@
 Revision history for perl distribution App-tt
 
+0.02 2016-07-19T11:02:15+0200
+ - Fix double printing of messages
+ - Fix uninitialized warnings
+ - Make "register" command easier to copy/paste
+
 0.01 2016-01-04T08:28:38+0100
  - Add action "analyze"
  - Add action "log"
