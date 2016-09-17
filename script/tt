@@ -26,6 +26,8 @@ version 'App::tt';
 $SIG{__DIE__} = sub { Carp::confess($_[0]) }
   if DEBUG;
 
+$ENV{TIMETRACKER_MIN_TIME} ||= 300;
+
 sub cmd_analyze {
   my $self      = shift;
   my $recursive = ref $_[0] ? shift : undef;
@@ -242,7 +244,7 @@ sub cmd_register {
 
   $self->_fill_duration(\%event);
 
-  if ($event{seconds} < 300) {
+  if ($event{seconds} < $ENV{TIMETRACKER_MIN_TIME}) {
     $self->_diag("Skipping $project - $start - $stop. Too short duration ($event{duration})");
     return 1;
   }
@@ -258,6 +260,7 @@ sub cmd_start {
   my $event = {};
   my $trc_file;
 
+  $self->_set_now(@args);
   $self->project($args[0]) if $args[0] and $args[0] =~ /^[A-Za-z0-9-]+$/;
   $self->project(basename(Cwd::getcwd)) if -d '.git' and !$self->project;
   $trc_file = $self->_trc_path($self->project, $self->_now);
@@ -285,10 +288,16 @@ sub cmd_start {
   _spurt(encode_json($event) => $trc_file);
   _spurt($trc_file => File::Spec->catfile($self->_root, 'previous'));
   $self->_say('Started working on project "%s" at %s.', $event->{project}, $self->_now->hms(':'));
+  return 0;
 }
 
 sub cmd_stop {
-  shift->_stop_previous;
+  my $self = shift;
+  my ($trc_file, $event) = $self->_get_previous_event;
+
+  $self->{now} = $self->_from_iso_8601($event->{start}) if $event->{start};
+  $self->_set_now(@_);
+  $self->_stop_previous;
 }
 
 sub cmd_status {
@@ -304,7 +313,7 @@ sub cmd_status {
   elsif ($event->{stop}) {
     $self->_say('Stopped working on "%s" at %s after %s',
       $event->{project}, $event->{stop}, $event->{duration});
-    return 3;    # No such process
+    return 0;
   }
   else {
     my $duration = $self->_now - $self->_from_iso_8601($event->{start}) + $self->_tzoffset;
@@ -400,7 +409,7 @@ sub _group_by_day {
   @log = map {
     my $p = join ', ', keys %{$_->{_project}};
     $pl = length $p if $pl < length $p;
-    +{%$_, project => $p, tags => [keys %{$_->{_tags}}],};
+    +{%$_, project => $p, tags => [keys %{$_->{_tags}}]};
   } map { $log{$_} } sort keys %log;
 
   return $pl, @log;
@@ -430,10 +439,19 @@ sub _root {
   };
 }
 
-sub _tzoffset {
+sub _set_now {
   my $self = shift;
-  $self->{tzoffset} ||= $self->_now->tzoffset;
+
+  if (my ($hm) = grep {/^\d+:\d+$/} @_) {
+    $hm =~ /^(\d+):(\d+)$/;
+    $self->{custom_now} = $hm;
+    $self->{now} = $self->_tp(H => $1, M => $2);
+  }
+
+  return $self;
 }
+
+sub _tzoffset { shift->_now->tzoffset }
 
 # From Mojo::Util
 sub _slurp {
@@ -473,7 +491,7 @@ sub _stop_previous {
   $event->{seconds}  = $duration->seconds;
   $event->{stop}     = $self->_now->datetime;
 
-  if ($event->{seconds} <= 300) {
+  if ($event->{seconds} < $ENV{TIMETRACKER_MIN_TIME}) {
     $self->_say('Dropping log event for "%s" since worked less than five minutes.',
       $event->{project});
     unlink $trc_file or die "rm $trc_file: $!";
@@ -528,11 +546,6 @@ app {
   if (!$self->description) {
     my ($description) = grep {/^\w\S*\s/} @_;
     $self->description($description) if $description;
-  }
-  if (my ($hm) = grep {/^\d+:\d+$/} @_) {
-    $hm =~ /^(\d+):(\d+)$/;
-    $self->{custom_now} = $hm;
-    $self->{now} = $self->_tp(H => $1, M => $2);
   }
 
   return $self->cmd_help unless $self->can($action);
