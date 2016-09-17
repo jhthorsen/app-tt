@@ -196,6 +196,8 @@ sub cmd_log {
     join(' ', $when->month, $when->year),
     $self->_hms_duration($seconds, 'hms')
   );
+
+  return 0;
 }
 
 sub cmd_register {
@@ -217,6 +219,11 @@ sub cmd_register {
   $description ||= '';
   $tags        ||= '';
   $trc_file = $self->_trc_path($project, $self->_from_iso_8601($start));
+
+  if (my $hms = $stop =~ /^(\d+:\d+:\d+)$/ ? $1 : '') {
+    $stop = $start;
+    $stop =~ s!\d+:\d+:\d+$!$hms!;
+  }
 
   %event = (
     __CLASS__ => 'App::TimeTracker::Data::Task',
@@ -243,6 +250,7 @@ sub cmd_register {
   make_path(dirname($trc_file));
   _spurt(encode_json(\%event) => $trc_file);
   $self->_say('Registered "%s" at %s with duration %s', @event{qw( project start duration )});
+  return 0;
 }
 
 sub cmd_start {
