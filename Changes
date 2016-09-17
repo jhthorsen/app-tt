@@ -1,6 +1,6 @@
 Revision history for perl distribution App-tt
 
-0.02 Not Released
+0.03 2016-09-17T20:37:18+0200
  - Fix "register" help output
  - Allow register to only take hh:mm:ss as "stop"
  - Change "stop" action to use the same date as "start"
