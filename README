@@ -2,7 +2,7 @@ NAME
     App::tt - Time tracking application
 
 VERSION
-    0.03
+    0.04
 
 DESCRIPTION
     App::tt is an application that can track how much time you spend on an

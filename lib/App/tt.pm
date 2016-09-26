@@ -6,7 +6,7 @@ App::tt - Time tracking application
 
 =head1 VERSION
 
-0.03
+0.04
 
 =head1 DESCRIPTION
 
@@ -126,7 +126,7 @@ This command will stop tracking the current event.
 use strict;
 use warnings;
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 =head1 COPYRIGHT AND LICENSE
 
