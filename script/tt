@@ -295,7 +295,12 @@ sub cmd_stop {
   my $self = shift;
   my ($trc_file, $event) = $self->_get_previous_event;
 
-  $self->{now} = $self->_from_iso_8601($event->{start}) if $event->{start};
+  if ($event->{start}) {
+    my $now = Time::Piece->new;
+    $self->{now} = $self->_from_iso_8601($event->{start});
+    $self->{now} = $self->_tp(H => $now->hour, M => $now->minute, S => $now->second);
+  }
+
   $self->_set_now(@_);
   $self->_stop_previous;
 }
@@ -521,7 +526,7 @@ sub _tp {
     $t{Y}--;
   }
 
-  Time::Piece->strptime(sprintf('%s-%s-%sT%s:%s:%s+0000', @t{qw( Y m d H M S )}),
+  Time::Piece->strptime(sprintf('%s-%s-%sT%s:%s:%s+0000', @t{qw(Y m d H M S)}),
     '%Y-%m-%dT%H:%M:%S%z');
 }
 

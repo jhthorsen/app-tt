@@ -1,5 +1,8 @@
 Revision history for perl distribution App-tt
 
+0.04 Not Released
+ - Fix setting default "stop" time HH:MM
+
 0.03 2016-09-17T20:37:18+0200
  - Fix "register" help output
  - Allow register to only take hh:mm:ss as "stop"

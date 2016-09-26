@@ -21,14 +21,16 @@ like $main::out, qr{0h 0m 0s}s, 'empty log';
 
 # stop at same day
 $main::out = '';
-$tt->{now} = Time::Piece->new(time - (time % 86400) - 140000);
+$tt->{now} = Time::Piece->new(time - (time % 86400) - 170_000);
 is $tt->cmd_start('yesterday'), 0, 'cmd_start yesterday';
 reset_tt();
-is $tt->cmd_stop('17:00'), 0, 'cmd_stop yesterday';
+is $tt->cmd_stop, 0, 'cmd_stop yesterday';
+ok !$tt->{custom_now}, 'no custom_now';
 
 $main::out = '';
 is $tt->cmd_log('year'), 0, 'cmd_log';
-like $main::out, qr{5h 53m 20s}i, 'total work time [1]';
+my @hms = $main::out =~ /(\d+)h (\d+)m (\d+)s/i;
+is $hms[0], $tt->{now}->hour - 3, 'total hours working';
 
 # cancel start because of TIMETRACKER_MIN_TIME
 reset_tt();
@@ -46,7 +48,8 @@ is $tt->cmd_stop('00:09'), 0, 'cmd_stop';
 reset_tt();
 $main::out = '';
 $tt->cmd_log('year');
-like $main::out, qr{6h 0m 20s}i, 'total work time [2]';
+$hms[1] += 7;
+like $main::out, qr/$hms[0]h $hms[1]m $hms[2]s/i, 'total work time';
 
 done_testing;
 
