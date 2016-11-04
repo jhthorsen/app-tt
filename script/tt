@@ -385,6 +385,7 @@ sub _edit_with_editor {
     $event->{$k} = $v;
   }
 
+  $self->_fill_duration($event);
   _spurt(encode_json($event) => $trc_file);
 
   return 0;
