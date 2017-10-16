@@ -1,5 +1,8 @@
 Revision history for perl distribution App-tt
 
+0.06 Not Released
+ - Fix sorting "tt log" dates
+
 0.05 2017-06-24T10:19:34+0200
  - Add support for "tt edit" or "tt edit <date>"
 
