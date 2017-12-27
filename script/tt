@@ -31,17 +31,14 @@ $ENV{TIMETRACKER_MIN_TIME} ||= 300;
 
 sub cmd_edit {
   my $self = shift;
-  my $doit = grep {/^--no-dry-run$/} @_;
-  my $dir  = readlink($self->_root) || $self->_root;
-  my $code = '';
-  my ($date, @files);
+  my $dir = readlink($self->_root) || $self->_root;
+  my ($code, $date, @files) = ('');
 
   if (@_ and -f $_[0]) {
     return $self->_edit_with_editor($_[0]);
   }
   elsif (-t STDIN) {
-    $date = $self->_date_arg(@_);
-    $code = sub { print "$_{file}\n"; };
+    1;    # edit last entry
   }
   else {
     $code .= $_ while <STDIN>;
@@ -56,21 +53,20 @@ sub cmd_edit {
       return if $date and not /$date/;
       my $f     = abs_path $_;
       my $event = decode_json(_slurp($f));
-      local %_ = (file => $f, date => $1, doit => $doit, file => $f, hms => $2, project => $3);
+      local %_ = (date => $1, file => $f, hms => $2, project => $3);
       $event->{tags} ||= [];
-      push @files, $f if $date and (!$self->project or $event->{project} eq $self->project);
-      $self->$code($event) or return;
+      push @files, $f if !$self->project or $event->{project} eq $self->project;
+      return unless $code and $self->$code($event);
       my $trc_file
         = abs_path($self->_trc_path($event->{project}, $self->_from_iso_8601($event->{start})));
-      return unless $doit;
       $self->_fill_duration($event);
       _spurt(encode_json($event) => $trc_file);
       unlink $f or die "rm $f: $!" if $f ne $trc_file;
     }
   }, $dir;
 
-  if (@files == 1) {
-    return $self->_edit_with_editor($files[0]);
+  if (@files == 1 or !$code) {
+    return $self->_edit_with_editor(+(sort { $b cmp $a } @files)[0]);
   }
 
   return 0;
@@ -341,22 +337,6 @@ sub _edit_with_editor {
   _spurt(encode_json($event) => $trc_file);
 
   return 0;
-}
-
-sub _date_arg {
-  my ($self, @args) = @_;
-  my $yesterday = $self->_now - 86400;
-  my @ymd       = map { $yesterday->$_ } qw(year mon mday);
-  my $fmt       = '%02s%02s%02s';
-
-  for (@args) {
-    if (/^\d+$/) {
-      return $_ if /^\d{8}$/;
-      return sprintf $fmt, @ymd[0, 1], $_ if /^\d{1,2}$/;
-    }
-  }
-
-  return sprintf $fmt, @ymd;
 }
 
 sub _diag {

@@ -59,14 +59,19 @@ Each action can tak C<-h> for more details. Example:
 
 =head2 edit
 
-This command can be used to rewrite all the log entries. See source
-code before running this action. (Internals might change)
+This command can be used to rewrite one all all the log entries.
+
+  # Edit the last entry with your favorite $EDITOR
+  $ tt edit
+
+  # Edit a given file with your favorite $EDITOR
+  $ tt edit ~/.TimeTracker/2017/12/20171220-092000_rg.trc
+
+  # Rewrite all the log entries with a perl script
+  # See source code before running this action. (Internals might change)
+  $ cat rewrite.pl | tt edit
 
 DISCLAIMER! Backup your files before running this action!
-
-  $ cat rewrite.pl | tt edit
-  # verify output, and then run:
-  $ cat rewrite.pl | tt edit --no-dry-run
 
 =head2 log
 
