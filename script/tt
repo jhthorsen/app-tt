@@ -29,54 +29,6 @@ $SIG{__DIE__} = sub { Carp::confess($_[0]) }
 
 $ENV{TIMETRACKER_MIN_TIME} ||= 300;
 
-sub cmd_analyze {
-  my $self      = shift;
-  my $recursive = ref $_[0] ? shift : undef;
-  my $since     = shift || 'last month';
-  my $dir       = shift || File::Spec->curdir;
-  my $user      = qx(git config user.name) || getpwuid $<;
-  my $log       = $recursive || {};
-
-  if (-d File::Spec->catdir($dir, '.git')) {
-    my $project = basename(abs_path $dir);
-    local $ENV{GIT_DIR} = File::Spec->catdir($dir, '.git');
-    open my $GIT, '-|', qw( git reflog --all ), "--author=$user", "--pretty=format:%ci %s",
-      "--since=$since"
-      or die $!;
-    while (<$GIT>) {
-      my ($ts, $description) = /^(\S+.\S+)\s(.*)/ or die "Invalid input: $_";
-      my $tag
-        = $description =~ /^\W*([A-Z]{2,}-[0-9]+)/ ? $1 : $description =~ /(\#\d+)/ ? $1 : $project;
-      $ts = $self->_from_iso_8601($ts);
-      next if $ts->hour < 5;    # should not work in the middle of the night
-      $description =~ s!^\s*\+[\d:]+\s+!!;    # $ts hopefully in localtime
-      my $event = $log->{$ts->ymd} ||= {stop => $ts};
-      $event->{start}       = $ts if $ts <= $event->{stop};
-      $event->{description} = $description;
-      $event->{project}     = $project;
-      $event->{tags}{$tag}  = 1;
-    }
-    return if $recursive;
-  }
-  else {
-    opendir(my $DH, $dir) or die "$dir: $!";
-    while (my $i = readdir $DH) {
-      $self->cmd_analyze($log, $since, File::Spec->catdir($dir, $i))
-        if -d File::Spec->catdir($dir, $i, '.git');
-    }
-  }
-
-  for my $event (sort { $a->{start} <=> $b->{start} } values %$log) {
-    my $tags = join ',', keys %{$event->{tags}};
-    $self->_say(
-      "%s\t%s\t%s\t%s\t%s",
-      $event->{start}->datetime,
-      $event->{stop}->datetime,
-      $event->{project}, $event->{description}, $tags
-    );
-  }
-}
-
 sub cmd_edit {
   my $self = shift;
   my $doit = grep {/^--no-dry-run$/} @_;

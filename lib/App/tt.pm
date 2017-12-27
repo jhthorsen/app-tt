@@ -33,8 +33,8 @@ optional arguments.
   $ tt help <action>
   $ tt <action> -h
 
-Available actions: L</analyze>, L</edit>, L</log>, L</register>, L</start>,
-L</status> (default) and L</stop>.
+Available actions: L</edit>, L</log>, L</register>, L</start>, L</status>
+(default) and L</stop>.
 
 Basic usage;
 
@@ -56,17 +56,6 @@ A bit more complex:
 Each action can tak C<-h> for more details. Example:
 
   $ tt start -h
-
-=head2 analyze
-
-This action can analyze all the git repos in a directory and print what time
-you started/stopped working on a set of repos grouped per day. The output
-is suitable for "tt register".
-
-  $ cd ..                  # one step up from the current git-project
-  $ tt analyze             # default is last month
-  $ tt analyze "last week" # analyze git reflog from last week
-  $ tt analyze 2015-07-01  # analyze git reflog since a given date
 
 =head2 edit
 
