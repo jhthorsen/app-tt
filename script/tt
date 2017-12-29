@@ -228,8 +228,9 @@ sub cmd_start {
   $self->_set_now(@args);
   $self->project($args[0]) if $args[0] and $args[0] =~ /^[A-Za-z0-9-]+$/;
   $self->project(basename(Cwd::getcwd)) if -d '.git' and !$self->project;
-  $trc_file = $self->_trc_path($self->project, $self->_now);
+  return $self->cmd_help('start') unless $self->project;
 
+  $trc_file = $self->_trc_path($self->project, $self->_now);
   warn "[APP_TT] start $trc_file\n" if DEBUG;
 
   if (!$self->project) {
