@@ -26,7 +26,7 @@ but it has (in my humble opinion) a simpler interface and easier to install.
 
 =head1 SYNOPSIS
 
-The application is built up by specifying an an L<action|/ACTIONS> and
+The application is built up by specifying an L<action|/ACTIONS> and
 optional arguments.
 
   $ tt <action> [options]
