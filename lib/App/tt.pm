@@ -73,6 +73,16 @@ This command can be used to rewrite one all all the log entries.
 
 DISCLAIMER! Backup your files before running this action!
 
+=head2 export
+
+This will export a given set of records as CSV.
+
+  $ tt log         # this month
+  $ tt log -2      # two months ago
+  $ tt log year    # log for year
+  $ tt log -1y     # last year
+  $ tt log -p foo  # Filter by project name
+
 =head2 log
 
 This command will report how much time you have spent on various
@@ -81,7 +91,7 @@ events.
   $ tt log         # this month
   $ tt log -2      # two months ago
   $ tt log year    # log for year
-  $ tt log year -1 # last year
+  $ tt log -1y     # last year
   $ tt log -p foo  # Filter by project name
 
 =head2 register
