@@ -576,13 +576,13 @@ sub _tp {
   my ($self, %t) = @_;
 
   $t{Y} ||= $self->_now->year;
-  $t{m} ||= $self->_now->mon;
-  $t{d} ||= $self->_now->mday;
+  $t{m} //= $self->_now->mon;
+  $t{d} //= $self->_now->mday;
   $t{H} ||= 0;
   $t{M} ||= 0;
   $t{S} ||= 0;
 
-  if ($t{m} < 0) {
+  if ($t{m} <= 0) {
     $t{m} = 12 - $t{m};
     $t{Y}--;
   }
