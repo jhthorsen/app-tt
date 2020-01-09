@@ -12,7 +12,7 @@ use File::HomeDir;
 use File::Path 'make_path';
 use File::Spec;
 use IO::Handle;
-use JSON::XS;
+use JSON::XS qw(decode_json encode_json);
 use Time::Piece;
 use constant DEBUG => $ENV{APP_TT_DEBUG} || 0;
 
@@ -329,7 +329,7 @@ sub _edit_with_editor {
 
   for (split /\n/, _slurp("$fh")) {
     my ($k, $v) = /^(\w+)\s*:\s*(.+)/ or next;
-    $v = [split /\W+/, $v] if $k eq 'tags';
+    $v = [grep {length} split /[\s,]+/, $v] if $k eq 'tags';
     $event->{$k} = $v;
   }
 
