@@ -26,30 +26,62 @@ but it has (in my humble opinion) a simpler interface and easier to install.
 
 =head1 SYNOPSIS
 
-The application is built up by specifying an L<action|/ACTIONS> and
-optional arguments.
+The application is built up by specifying an action and optional arguments.
+Here is a list of example usages, but you can get more details by adding "-h"
+after each action.
 
+  # Basic usage
   $ tt <action> [options]
-  $ tt help <action>
   $ tt <action> -h
+  $ tt help <action>
 
-Available actions: L</edit>, L</log>, L</register>, L</start>, L</status>
-(default) and L</stop>.
+  # Register forgotten time
+  $ tt register 1983-01-10T09:00:00 17:00:00 "project-name"
+  $ tt register 1983-01-10T09:00:00 17:00:00 "project-name" "" "tag1,tag2"
+  $ tt register 1983-01-10T09:00:00 17:00:00 "project-name" "description" "tag1,tag2"
+
+  # Edit the last entry, or a specific file
+  $ tt edit
+  $ tt edit ~/.TimeTracker/2020/01/20200106-150000_nms.trc
+
+  # See the log
+  $ tt log
+  $ tt log -0year                  # Log for this year
+  $ tt log -1year -t meetings      # Log for last year, for tag "meetings"
+  $ tt log -p project-name -1month # Log for last month, for project "project-name"
+  $ tt log -2                      # Log for two months back
+
+  # Start tracking time
+  $ tt start
+  $ tt start -p project-name -t tag1,tag2
+  $ tt start -p project-name -t tag1,tag2 09:03
+
+  # Current status
+  $ tt
+  $ tt status
+
+  # Stop tracking time. Specifiying a time will go back to yesterday,
+  # in case you forgot to stop it.
+  $ tt stop
+  $ tt stop 18:04
 
 Basic usage;
 
   # Start to track time
   $ cd $HOME/git/my-project
   $ tt start
+
   # Work, work, work, cd ..., do other stuff
   $ tt stop
 
-A bit more complex:
+A more complex example:
 
   # Start to work on an event and add a tag
   $ tt start -t ISSUE-999 -p some-project-at-work
-  # Add another tag to the same event and add a --comment
-  $ tt stop -t GITHUB-1005 "Today I was mostly in meetings"
+
+  # Add another tag to the same event and add a --comment and specify when
+  # you stopped working
+  $ tt stop -t GITHUB-1005 "Today I was mostly in meetings" 15:24
 
 =head1 ACTIONS
 
