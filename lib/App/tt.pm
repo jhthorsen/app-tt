@@ -26,14 +26,9 @@ but it has (in my humble opinion) a simpler interface and easier to install.
 
 =head1 SYNOPSIS
 
-The application is built up by specifying an action and optional arguments.
+The application is built up by specifying an command and optional arguments.
 Here is a list of example usages, but you can get more details by adding "-h"
-after each action.
-
-  # Basic usage
-  $ tt <action> [options]
-  $ tt <action> -h
-  $ tt help <action>
+after each command.
 
   # Register forgotten time
   $ tt register 1983-01-10T09:00:00 17:00:00 "project-name"
@@ -85,13 +80,13 @@ A more complex example:
 
 =head1 ACTIONS
 
-Each action can tak C<-h> for more details. Example:
+Each command can tak C<-h> for more details. Example:
 
   $ tt start -h
 
 =head2 edit
 
-This command can be used to rewrite one all all the log entries.
+This command can be used to rewrite a log entry.
 
   # Edit the last entry with your favorite $EDITOR
   $ tt edit
@@ -100,10 +95,8 @@ This command can be used to rewrite one all all the log entries.
   $ tt edit ~/.TimeTracker/2017/12/20171220-092000_rg.trc
 
   # Rewrite all the log entries with a perl script
-  # See source code before running this action. (Internals might change)
+  # See source code before running this command. (Internals might change)
   $ cat rewrite.pl | tt edit
-
-DISCLAIMER! Backup your files before running this action!
 
 =head2 export
 
@@ -137,10 +130,9 @@ specified by -t foo -t bar
 
 =head2 start
 
-This command will start tracking a new event. It will also stop the
-current event if any event is in process. This action takes the
-"-p" and "-t" switches. "-p" (project) is not required if you start
-from a git repository.
+This command will start tracking a new event. It will also stop the current
+event if any event is in process. This command takes the "-p" and "-t"
+switches. "-p" (project) is not required if you start from a git repository.
 
   # Specify a tag and custom project name
   $ tt start -t ISSUE-999 some-project-name
@@ -150,7 +142,7 @@ from a git repository.
 
 =head2 status
 
-This is the default action and will return the current status:
+This is the default command and will return the current status:
 Are you working on something or not?
 
   $ tt status

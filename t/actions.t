@@ -2,9 +2,6 @@ use lib '.';
 use t::Helper;
 
 my $tt = t::Helper->tt;
-
-for my $action (split /\W/, 'log,start,stop,status,register') {
-  ok $tt->can("cmd_$action"), "tt $action";
-}
+ok $tt->can("command_$_"), "tt $_" for qw(export log start stop status register);
 
 done_testing;

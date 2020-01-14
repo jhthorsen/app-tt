@@ -16,10 +16,8 @@ use JSON::XS qw(decode_json encode_json);
 use Time::Piece;
 use constant DEBUG => $ENV{APP_TT_DEBUG} || 0;
 
-option str => description => 'Description for an event',            alias => 'd';
-option str => tag         => 'Tags for an event',                   alias => 't', n_of => '@';
-option str => project     => 'Project name. Normally autodetected', alias => 'p';
-option str => group_by    => 'Group log output: --group-by day',    alias => 'g';
+option str => project => 'Project name. Normally autodetected', alias => 'p';
+option str => tag => 'Tags for an event', alias => 't', n_of => '@';
 
 documentation 'App::tt';
 version 'App::tt';
@@ -31,7 +29,34 @@ $SIG{__DIE__} = sub { Carp::confess($_[0]) }
 
 $ENV{TIMETRACKER_MIN_TIME} ||= 300;
 
-sub cmd_edit {
+subcommand edit => 'Edit a .trc file' => sub { };
+
+subcommand export => 'Export log data as csv' => sub {
+  option str => group_by => 'Group log output: --group-by day', alias => 'g';
+};
+
+subcommand help => 'Show help for a command' => sub { };
+
+subcommand log => 'Show log data' => sub {
+  option str => group_by => 'Group log output: --group-by day', alias => 'g';
+};
+
+subcommand register => 'Register an event' => sub {
+  option str => description => 'Description for an event', alias => 'd';
+};
+
+subcommand start => 'Start tracking a new event' => sub {
+  option str => description => 'Description for an event', alias => 'd';
+};
+
+subcommand stop => 'Stop tracking' => sub {
+  option str => tag         => 'Tags for an event',        alias => 't', n_of => '@';
+  option str => description => 'Description for an event', alias => 'd';
+};
+
+subcommand status => 'Show current status' => sub { };
+
+sub command_edit {
   my $self = shift;
   my $dir  = readlink($self->_root) || $self->_root;
   my ($code, $date, @files) = ('');
@@ -74,7 +99,7 @@ sub cmd_edit {
   return 0;
 }
 
-sub cmd_export {
+sub command_export {
   my $self = shift;
   my $res  = $self->_log(@_);
 
@@ -111,7 +136,7 @@ sub cmd_export {
   return 0;
 }
 
-sub cmd_help {
+sub command_help {
   my $self  = shift;
   my $for   = shift || 'app';
   my $today = $self->_now->ymd;
@@ -138,7 +163,7 @@ sub cmd_help {
   return 0;
 }
 
-sub cmd_log {
+sub command_log {
   my $self = shift;
   my $res  = $self->_log(@_);
 
@@ -166,7 +191,7 @@ sub cmd_log {
   return 0;
 }
 
-sub cmd_register {
+sub command_register {
   my ($self, $start, $stop, $project, $description, $tags) = @_;
   my ($trc_file, %event);
 
@@ -175,12 +200,12 @@ sub cmd_register {
       next if /^\s*#/;
       chomp;
       my @args = split /\t/;
-      $self->cmd_register(@args) if $args[0] and $args[1] and $args[2];
+      $self->command_register(@args) if $args[0] and $args[1] and $args[2];
     }
     return 0;
   }
 
-  return $self->cmd_help('register') unless $start and $stop and $project;
+  return $self->command_help('register') unless $start and $stop and $project;
 
   $description ||= '';
   $tags        ||= '';
@@ -219,7 +244,7 @@ sub cmd_register {
   return 0;
 }
 
-sub cmd_start {
+sub command_start {
   my ($self, @args) = @_;
   my $event = {};
   my $trc_file;
@@ -227,7 +252,7 @@ sub cmd_start {
   $self->_set_now(@args);
   $self->project($args[0]) if $args[0] and $args[0] =~ /^[A-Za-z0-9-]+$/;
   $self->project(basename(Cwd::getcwd)) if -d '.git' and !$self->project;
-  return $self->cmd_help('start') unless $self->project;
+  return $self->command_help('start') unless $self->project;
 
   $trc_file = $self->_trc_path($self->project, $self->_now);
   warn "[APP_TT] start $trc_file\n" if DEBUG;
@@ -256,7 +281,7 @@ sub cmd_start {
   return 0;
 }
 
-sub cmd_stop {
+sub command_stop {
   my $self = shift;
   my ($trc_file, $event) = $self->_get_previous_event;
 
@@ -270,7 +295,7 @@ sub cmd_stop {
   $self->_stop_previous;
 }
 
-sub cmd_status {
+sub command_status {
   my $self = shift;
   my ($trc_file, $event) = $self->_get_previous_event;
 
@@ -295,7 +320,6 @@ sub cmd_status {
 
 sub _add_event_info {
   my ($self, $event) = @_;
-  my $tags = $self->tag || [];
 
   $event->{__CLASS__} ||= 'App::TimeTracker::Data::Task';
   $event->{project}   ||= $self->project;
@@ -306,9 +330,8 @@ sub _add_event_info {
 
   $event->{description} = $self->description if $self->description;
 
-  for my $t (ref $tags ? @$tags : $tags) {
-    push @{$event->{tags}}, $t;
-  }
+  my $tags = $self->tag || [];
+  push @{$event->{tags}}, $_ for ref $tags ? @$tags : ($tags);
 }
 
 sub _edit_with_editor {
@@ -599,17 +622,7 @@ sub _trc_path {
 }
 
 app {
-  my $self   = shift;
-  my $action = sprintf 'cmd_%s', shift || 'status';
-
-  if ($ENV{APP_TT_HELP}) {
-    return $self->cmd_help($ENV{APP_TT_HELP});
-  }
-  if (!$self->description) {
-    my ($description) = grep {/^\w\S*\s/} @_;
-    $self->description($description) if $description;
-  }
-
-  return $self->cmd_help unless $self->can($action);
-  return $self->$action(@_);
+  my $self = shift;
+  return $self->command_help($ENV{APP_TT_HELP}) if $ENV{APP_TT_HELP};
+  return $self->command_status;
 };
