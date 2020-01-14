@@ -102,11 +102,11 @@ This command can be used to rewrite a log entry.
 
 This will export a given set of records as CSV.
 
-  $ tt log         # this month
-  $ tt log -2      # two months ago
-  $ tt log year    # log for year
-  $ tt log -1y     # last year
-  $ tt log -p foo  # Filter by project name
+  $ tt export         # this month
+  $ tt export -2      # two months ago
+  $ tt export year    # log for year
+  $ tt export -1y     # last year
+  $ tt export -p foo  # Filter by project name
 
 =head2 log
 
@@ -125,8 +125,7 @@ This command is used to import data from other sources. "project-name" default t
 "-p" or current git project, "some description" default to "-d" and tags can be
 specified by -t foo -t bar
 
-  $ tt register 2016-06-28T09:00:00 17:00:00 "project-name" "some description" "foo,bar"
-  $ echo "2016-06-28T09:00:00\t2016-06-28T17:00:00\tproject-name\tsome description\tfoo,bar" | tt register
+  $ tt register 2016-06-28T09:00:00 17:00:00 -p project-name -d "some description" -t foo -t bar
 
 =head2 start
 
@@ -150,9 +149,6 @@ Are you working on something or not?
 =head2 stop
 
 This command will stop tracking the current event.
-
-  # Add more tags to the current event
-  $ tt stop -t meetings -t not_fun
 
   # Stop working at 16:00 instead of now
   $ tt stop 16:00

@@ -3,7 +3,7 @@ use t::Helper;
 use File::Path 'remove_tree';
 use File::Spec::Functions 'catdir';
 
-plan skip_all => '.git missing' unless -d '.git';
+plan skip_all => 'TEST_ALL=1' unless $ENV{TEST_ALL};
 
 remove_tree(catdir qw(t .TimeTracker-start-stop.t));
 

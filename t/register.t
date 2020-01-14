@@ -3,7 +3,7 @@ use t::Helper;
 use File::Path 'remove_tree';
 use File::Spec::Functions 'catdir';
 
-plan skip_all => '.git missing' unless -d '.git';
+plan skip_all => 'TEST_ALL=1' unless $ENV{TEST_ALL};
 
 my $tt   = t::Helper->tt;
 my $year = 1900 + (localtime)[5] - 1;
