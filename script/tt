@@ -64,14 +64,13 @@ subcommand status => 'Show current status' => sub { };
 sub command_edit {
   my $self = shift;
   return $self->_edit_with_editor($_[0]) if @_ and -f $_[0];    # Edit a given file
+  return $self->_edit_with_editor if -t STDIN;                  # Edit last file
 
   # Edit all files with code from STDIN
   my $code = '';
-  unless (-t STDIN) {
-    $code .= $_ while <STDIN>;
-    $code = "sub {$code}" unless $code =~ /^\s*sub\b/s;
-    $code = eval "use 5.10.1;$code" or die "Could not compile code from STDIN: $@\n";
-  }
+  $code .= $_ while <STDIN>;
+  $code = "sub {$code}" unless $code =~ /^\s*sub\b/s;
+  $code = eval "use 5.10.1;$code" or die "Could not compile code from STDIN: $@\n";
 
   my @files;
   find(
@@ -89,9 +88,6 @@ sub command_edit {
     },
     $self->_root,
   );
-
-  # Edit the last file
-  return $self->_edit_with_editor((sort { $b cmp $a } @files)[0]) if @files and !$code;
 
   return 0;
 }
@@ -298,7 +294,10 @@ sub _add_event_info {
 sub _edit_with_editor {
   require File::Temp;
   my ($self, $trc_file) = @_;
-  my $event = $self->_load($trc_file);
+  my ($event, $prev) = $trc_file ? ($self->_load($trc_file), 0) : ($self->_get_previous_event, 1);
+
+  $trc_file = $event->{path} //= 'Not found';
+  die "Could not find file to edit. ($event->{path})\n" unless $event->{start};
 
   my $fh = File::Temp->new;
   printf $fh "# %s\n", $event->{path};
@@ -321,6 +320,7 @@ sub _edit_with_editor {
   }
 
   $self->_save($event);
+  _spurt($event->{path} => File::Spec->catfile($self->_root, 'previous')) if $prev;
   unlink $trc_file or die "rm $trc_file: $!" unless $trc_file eq $event->{path};
   return 0;
 }
@@ -352,7 +352,6 @@ sub _get_previous_event {
   my $previous = File::Spec->catfile($self->_root, 'previous');
   return {path => ''} unless -r $previous;
   my $trc_file = _slurp($previous);    # $ROOT/previous contains path to last .trc file
-  return {path => $trc_file} unless -r $trc_file;
   return -r $trc_file ? $self->_load($trc_file) : {path => $trc_file};
 }
 
