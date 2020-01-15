@@ -277,7 +277,7 @@ sub command_status {
     return 0;
   }
   else {
-    my $duration = $NOW - $event->{start} + $self->_tzoffset;
+    my $duration = $NOW - $event->{start} + $NOW->tzoffset;
     $self->_say('Been working on "%s", for %s',
       $event->{project}, $self->_hms_duration($duration, 'hms'));
     return 0;
@@ -502,8 +502,6 @@ sub _tags {
   return uniq map { split /,/, $_ } @{$self->tag || []};
 }
 
-sub _tzoffset { $NOW->tzoffset }
-
 # From Mojo::Util
 sub _slurp {
   my $path = shift;
@@ -530,7 +528,7 @@ sub _stop_previous {
 
   $event->{stop} = $self->_time(+(grep {/\d+\:/} @args)[0]);
 
-  my $duration = $event->{stop} - $event->{start} + $self->_tzoffset;
+  my $duration = $event->{stop} - $event->{start};
   die "Cannot log event shorter than a second! Need to manually edit $event->{path}"
     if $duration->seconds < 0;
 
