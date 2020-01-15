@@ -15,6 +15,7 @@ use IO::Handle;
 use JSON::XS qw(decode_json encode_json);
 use List::Util 'uniq';
 use Time::Piece;
+use Time::Seconds;
 
 use constant DEBUG => $ENV{APP_TT_DEBUG} || 0;
 
@@ -179,8 +180,24 @@ sub command_log {
     "\nTotal for %s events since %s: %s",
     $res->{events},
     join(' ', $res->{when}->month, $res->{when}->year),
-    $self->_hms_duration($res->{seconds}, 'hms')
+    $self->_hms_duration($res->{seconds}, 'hms'),
   );
+
+  if ($ENV{TT_HOURS_PER_DAY} and $res->{interval} eq 'month') {
+    my $start = $self->_time(d => 1, H => 0, M => 0, S => 0);
+    my $end   = $self->_time(H => 0, M => 0, S => 0);
+    my $days  = 0;
+    while ($start <= $end) {
+      $days++ if $start->day_of_week != 0 and $start->day_of_week != 6;
+      $start += ONE_DAY;
+    }
+
+    $self->_diag(
+      "Worked %s out of %s",
+      $self->_hms_duration($res->{seconds},                       'hms'),
+      $self->_hms_duration($ENV{TT_HOURS_PER_DAY} * 3600 * $days, 'hms'),
+    );
+  }
 
   return 0;
 }
