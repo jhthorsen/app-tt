@@ -141,7 +141,7 @@ sub command_help {
   require App::tt;
   open my $POD, '<', $INC{'App/tt.pm'} or die "Cannot open App/tt.pm: $!";
   while (<$POD>) {
-    s/\b2016-06-28(T\d+:)/$today$1/g;    # make "register" command easier to copy/paste
+    s/\b2020-01-01(T\d+:)/$today$1/g;    # make "register" command easier to copy/paste
     push @help, $_ if /^=head2 $for/ ... /^=(head|cut)/;
   }
 
@@ -221,14 +221,9 @@ sub command_register {
     return 1;
   }
 
-  if ($event{seconds} < $ENV{TIMETRACKER_MIN_TIME}) {
-    $self->_diag("Too short duration ($event{duration})");
-    return 1;
-  }
-
-  $self->_save(\%event);
-  $self->_say('Registered "%s" at %s with duration %s', @event{qw(project start duration)});
-  return 0;
+  $self->_say('Registered "%s" at %s with duration %s', @event{qw(project start duration)})
+    if $self->_save(\%event);
+  return $!;
 }
 
 sub command_start {
@@ -243,8 +238,7 @@ sub command_start {
   return $self->command_help('start') unless $event->{project};
 
   $self->_stop_previous(@args);
-  $self->_add_event_info($event);
-  $self->_save($event);
+  return $! unless $self->_save($event);
   _spurt($event->{path} => File::Spec->catfile($self->_root, 'previous'));
   $self->_say('Started working on project "%s" at %s.',
     $event->{project}, $event->{start}->hms(':'));
@@ -280,17 +274,6 @@ sub command_status {
   }
 }
 
-sub _add_event_info {
-  my ($self, $event) = @_;
-
-  $event->{__CLASS__}   ||= 'App::TimeTracker::Data::Task';
-  $event->{description} ||= $self->description // '';
-  $event->{project}     ||= $self->project;
-  $event->{seconds}     ||= undef;
-  $event->{tags}        ||= [uniq @{$event->{tags} || []}, $self->_tags];
-  $event->{user}        ||= scalar(getpwuid $<);
-}
-
 sub _edit_with_editor {
   require File::Temp;
   my ($self, $trc_file) = @_;
@@ -319,7 +302,7 @@ sub _edit_with_editor {
     $event->{$k} = $v;
   }
 
-  $self->_save($event);
+  return $! unless $self->_save($event);
   _spurt($event->{path} => File::Spec->catfile($self->_root, 'previous')) if $prev;
   unlink $trc_file or die "rm $trc_file: $!" unless $trc_file eq $event->{path};
   return 0;
@@ -480,19 +463,34 @@ sub _root {
 
 sub _save {
   my ($self, $event) = @_;
-  my %event = %$event;
 
+  $event->{__CLASS__}   ||= 'App::TimeTracker::Data::Task';
+  $event->{description} ||= $self->description // '';
+  $event->{duration}    ||= '0:00';
+  $event->{project}     ||= $self->project;
+  $event->{seconds}     ||= 0;
+  $event->{tags}        ||= [uniq @{$event->{tags} || []}, $self->_tags];
+  $event->{user}        ||= scalar(getpwuid $<);
+
+  if (my $duration = $event->{stop} && $event->{start} && $event->{stop} - $event->{start}) {
+    $event->{seconds}  = $duration->seconds;
+    $event->{duration} = $self->_hms_duration($duration);
+  }
+  if ($event->{stop} and $event->{seconds} < $ENV{TIMETRACKER_MIN_TIME}) {
+    $self->_diag("Too short duration ($event->{duration})");
+    $! = 52;
+    return 0;
+  }
+
+  my %event = %$event;
   delete $event{path};
   $event{start} = $event->{start}->datetime if $event->{start};
   $event{stop}  = $event->{stop}->datetime  if $event->{stop};
 
-  my $duration = $event->{stop} && $event->{start} ? $event->{stop} - $event->{start} : undef;
-  $event{seconds} = $duration->seconds if defined $duration;
-  $event{duration} = $self->_hms_duration($duration) if defined $duration;
-
   $event->{path} = $self->_trc_path($event->{project}, $event->{start});
   make_path(dirname($event->{path})) unless -d dirname($event->{path});
   _spurt(encode_json(\%event) => $event->{path});
+  return 1;
 }
 
 sub _tags {
@@ -528,22 +526,20 @@ sub _stop_previous {
   $event->{stop} = $self->_time(+(grep {/\d+\:/} @args)[0]);
 
   my $duration = $event->{stop} - $event->{start};
-  die "Cannot log event shorter than a second! Need to manually edit $event->{path}"
-    if $duration->seconds < 0;
-
   if ($duration->seconds < $ENV{TIMETRACKER_MIN_TIME}) {
-    $self->_say('Dropping log event for "%s" since worked less than five minutes.',
+    $self->_say(qq(Dropping log event for "%s" since worked less than $ENV{TIMETRACKER_MIN_TIME}s.),
       $event->{project});
     unlink $event->{path} or die "rm $event->{path}: $!";
     return 52;
   }
-  else {
-    $self->_add_event_info($event);
-    $self->_save($event);
+
+  if ($self->_save($event)) {
     $self->_say('Stopped working on "%s" after %s',
       $event->{project}, $self->_hms_duration($duration, 'hms'));
     return 0;
   }
+
+  return $! || 1;
 }
 
 sub _time {
