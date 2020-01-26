@@ -12,7 +12,7 @@ use File::HomeDir;
 use File::Path 'make_path';
 use File::Spec;
 use IO::Handle;
-use JSON::XS qw(decode_json encode_json);
+use JSON::XS ();
 use List::Util 'uniq';
 use Time::Piece;
 use Time::Seconds;
@@ -263,7 +263,7 @@ sub command_status {
   }
   elsif ($event->{stop}) {
     $self->_say('Stopped working on "%s" at %s after %s',
-      $event->{project}, $event->{stop}, $event->{duration});
+      $event->{project}, $event->{stop}, $self->_hms_duration($event->{seconds}));
     return 0;
   }
   else {
@@ -379,7 +379,7 @@ sub _hms_duration {
 
 sub _load {
   my ($self, $trc_file) = @_;
-  my $trc = decode_json(_slurp($trc_file));
+  my $trc = JSON::XS::decode_json(_slurp($trc_file));
   $trc->{path} = $trc_file;
   $trc->{tags} = [map { split /\s*,\s*/, $_ } @{$trc->{tags} || []}];
   $trc->{$_}   = $self->_time($trc->{$_}) for grep { $trc->{$_} } qw(start stop);
@@ -418,12 +418,11 @@ sub _log {
     no_chdir => 0,
     wanted   => sub {
       my ($date, $hms, $project) = /^(\d+)-(\d+)_(.*)\.trc$/ or return;
-      my $event = decode_json(_slurp($_));
-      $event->{tags} ||= [];
+      my $event = $self->_load($_);
       return if @project_re and !grep { $event->{project} =~ $_ } @project_re;
       return if $tags       and !grep { $tags =~ /\b$_\b/ } @{$event->{tags}};
-      return unless $event->{seconds};
-      $event->{start} = $self->_time($event->{start});
+      $event->{stop}    ||= $NOW + $NOW->tzoffset;
+      $event->{seconds} ||= $event->{stop} - $event->{start};
       push @{$res->{log}},
         $self->_fill_log_days(@{$res->{log}} ? $res->{log}[-1]{start} : $res->{when},
         $event->{start})
@@ -466,18 +465,16 @@ sub _save {
 
   $event->{__CLASS__}   ||= 'App::TimeTracker::Data::Task';
   $event->{description} ||= $self->description // '';
-  $event->{duration}    ||= '0:00';
   $event->{project}     ||= $self->project;
   $event->{seconds}     ||= 0;
   $event->{tags}        ||= [uniq @{$event->{tags} || []}, $self->_tags];
   $event->{user}        ||= scalar(getpwuid $<);
 
   if (my $duration = $event->{stop} && $event->{start} && $event->{stop} - $event->{start}) {
-    $event->{seconds}  = $duration->seconds;
-    $event->{duration} = $self->_hms_duration($duration);
+    $event->{seconds} = $duration->seconds;
   }
   if ($event->{stop} and $event->{seconds} < $ENV{TIMETRACKER_MIN_TIME}) {
-    $self->_diag("Too short duration ($event->{duration})");
+    $self->_diag('Too short duration (%s)', $self->_hms_duration($event->{duration}));
     $! = 52;
     return 0;
   }
@@ -486,10 +483,11 @@ sub _save {
   delete $event{path};
   $event{start} = $event->{start}->datetime if $event->{start};
   $event{stop}  = $event->{stop}->datetime  if $event->{stop};
+  $event{duration} = $self->_hms_duration($event{seconds});   # Used by App::TimeTracker::Data::Task
 
   $event->{path} = $self->_trc_path($event->{project}, $event->{start});
   make_path(dirname($event->{path})) unless -d dirname($event->{path});
-  _spurt(encode_json(\%event) => $event->{path});
+  _spurt(JSON::XS::encode_json(\%event) => $event->{path});
   return 1;
 }
 

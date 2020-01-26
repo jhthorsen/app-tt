@@ -3,6 +3,7 @@ Revision history for perl distribution App-tt
 0.11 Not Released
  - Fix bug where editing would split tags on "-"
  - Fix not saving duplicate tags
+ - Add current task to "tt log"
  - Add support for TT_HOURS_PER_DAY
  - Changed "tt register" to require -p, -t, arguments
  - Changed "tt register" to not reading from STDIN
