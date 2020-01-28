@@ -34,7 +34,9 @@ $SIG{__DIE__} = sub { Carp::confess($_[0]) }
 
 $ENV{TIMETRACKER_MIN_TIME} ||= 300;
 
-subcommand edit => 'Edit a .trc file' => sub { };
+subcommand edit => 'Edit a .trc file' => sub {
+  option str => description => 'Description for an event', alias => 'd';
+};
 
 subcommand export => 'Export log data as csv' => sub {
   option str => group_by => 'Group log output: --group-by day', alias => 'g';
