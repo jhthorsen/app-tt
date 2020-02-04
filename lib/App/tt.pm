@@ -31,9 +31,9 @@ Here is a list of example usages, but you can get more details by adding "-h"
 after each command.
 
   # Register forgotten time
-  $ tt register 2020-01-01T09:00:00 17:00:00 "project-name"
-  $ tt register 2020-01-01T09:00:00 17:00:00 "project-name" "" "tag1,tag2"
-  $ tt register 2020-01-01T09:00:00 17:00:00 "project-name" "description" "tag1,tag2"
+  $ tt register 2020-01-01T09:00:00 17:00:00 -p "project-name"
+  $ tt register 2020-01-01T09:00:00 17:00:00 -p "project-name" -t "tag1,tag2"
+  $ tt register 2020-01-01T09:00:00 17:00:00 -p "project-name" -d "description" -t "tag1,tag2"
 
   # Edit the last entry, or a specific file
   $ tt edit
