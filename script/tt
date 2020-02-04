@@ -592,7 +592,7 @@ sub _trc_path {
   $project =~ s!\W!_!g;
   $file = sprintf '%s-%s_%s.trc', $t->ymd(''), $t->hms(''), $project;
 
-  return abs_path(File::Spec->catfile($self->_root, $t->year, $month, $file));
+  return File::Spec->catfile($self->_root, $t->year, $month, $file);
 }
 
 app {
