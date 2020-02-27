@@ -20,7 +20,7 @@ use Time::Seconds;
 use constant DEBUG => $ENV{APP_TT_DEBUG} || 0;
 
 option str => project => 'Project name. Normally autodetected', alias => 'p';
-option str => tag => 'Tags for an event', alias => 't', n_of => '@';
+option str => tag     => 'Tags for an event',                   alias => 't', n_of => '@';
 
 documentation 'App::tt';
 version 'App::tt';
@@ -66,7 +66,7 @@ subcommand status => 'Show current status' => sub { };
 sub command_edit {
   my $self = shift;
   return $self->_edit_with_editor($_[0]) if @_ and -f $_[0];    # Edit a given file
-  return $self->_edit_with_editor if -t STDIN;                  # Edit last file
+  return $self->_edit_with_editor        if -t STDIN;           # Edit last file
 
   # Edit all files with code from STDIN
   my $code = '';
@@ -181,21 +181,7 @@ sub command_log {
     $self->_hms_duration($res->{seconds}, 'hms'),
   );
 
-  if ($ENV{TT_HOURS_PER_DAY} and $res->{interval} eq 'month') {
-    my $start = $self->_time(d => 1, H => 0, M => 0, S => 0);
-    my $end   = $self->_time(H => 0, M => 0, S => 0);
-    my $days  = 0;
-    while ($start <= $end) {
-      $days++ if $start->day_of_week != 0 and $start->day_of_week != 6;
-      $start += ONE_DAY;
-    }
-
-    $self->_diag(
-      "Worked %s out of %s",
-      $self->_hms_duration($res->{seconds},                       'hms'),
-      $self->_hms_duration($ENV{TT_HOURS_PER_DAY} * 3600 * $days, 'hms'),
-    );
-  }
+  $self->_log_print_time_left($res);
 
   return 0;
 }
@@ -299,7 +285,7 @@ sub _edit_with_editor {
   for (split /\n/, _slurp("$fh")) {
     my ($k, $v) = /^(\w+)\s*:\s*(.+)/ or next;
     $v = [grep {length} split /[\s,]+/, $v] if $k eq 'tags';
-    $v = $self->_time(str => $v) if $k eq 'start';
+    $v = $self->_time(str => $v)                         if $k eq 'start';
     $v = $self->_time(str => $v, ref => $event->{start}) if $k eq 'stop';
     $event->{$k} = $v;
   }
@@ -422,7 +408,7 @@ sub _log {
       my ($date, $hms, $project) = /^(\d+)-(\d+)_(.*)\.trc$/ or return;
       my $event = $self->_load($_);
       return if @project_re and !grep { $event->{project} =~ $_ } @project_re;
-      return if $tags       and !grep { $tags =~ /\b$_\b/ } @{$event->{tags}};
+      return if $tags       and !grep { $tags             =~ /\b$_\b/ } @{$event->{tags}};
       $event->{stop}    ||= $NOW + $NOW->tzoffset;
       $event->{seconds} ||= $event->{stop} - $event->{start};
       push @{$res->{log}},
@@ -447,6 +433,33 @@ sub _log {
   }
 
   return $res;
+}
+
+sub _log_print_time_left {
+  my ($self, $res) = @_;
+  return unless $ENV{TT_HOURS_PER_MONTH} and $res->{interval} eq 'month';
+
+  my $start       = $self->_time(d => 1, H => 0, M => 0, S => 0);
+  my $end         = $self->_time(d => 1, m => $start->mon + 1, H => 0, M => 0, S => 0);
+  my $total_days  = 0;
+  my $worked_days = 0;
+  while ($start < $end) {
+    if ($start->day_of_week != 0 and $start->day_of_week != 6) {
+      $worked_days++ if $start < $NOW;
+      $total_days++;
+    }
+    $start += ONE_DAY;
+  }
+
+  my $remaining_days    = $total_days - $worked_days + 1;
+  my $total_seconds     = $ENV{TT_HOURS_PER_MONTH} * 3600;
+  my $remaining_seconds = $total_seconds - $res->{seconds};
+
+  $self->_diag(
+    'Remaining this month: %sd, %sh/d.',
+    $remaining_days > 0 ? $remaining_days : 0,
+    $self->_hms_duration($remaining_seconds / ($remaining_days < 0 ? 1 : $remaining_days), 'hm'),
+  );
 }
 
 sub _root {
