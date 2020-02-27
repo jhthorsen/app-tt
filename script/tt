@@ -451,14 +451,14 @@ sub _log_print_time_left {
     $start += ONE_DAY;
   }
 
-  my $remaining_days    = $total_days - $worked_days + 1;
+  my $remaining_days    = $total_days - $worked_days + ($NOW->hour > 12 ? 0 : 1);
   my $total_seconds     = $ENV{TT_HOURS_PER_MONTH} * 3600;
   my $remaining_seconds = $total_seconds - $res->{seconds};
 
   $self->_diag(
     'Remaining this month: %sd, %sh/d.',
     $remaining_days > 0 ? $remaining_days : 0,
-    $self->_hms_duration($remaining_seconds / ($remaining_days < 0 ? 1 : $remaining_days), 'hm'),
+    $self->_hms_duration($remaining_seconds / ($remaining_days <= 0 ? 1 : $remaining_days), 'hm'),
   );
 }
 
