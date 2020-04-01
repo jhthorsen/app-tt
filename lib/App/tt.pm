@@ -2,7 +2,7 @@ package App::tt;
 use strict;
 use warnings;
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 1;
 
@@ -14,7 +14,7 @@ App::tt - Time tracking application
 
 =head1 VERSION
 
-0.10
+0.11
 
 =head1 DESCRIPTION
 
@@ -118,6 +118,14 @@ events.
   $ tt log year    # log for year
   $ tt log -1y     # last year
   $ tt log -p foo  # Filter by project name
+
+If you set the "TT_HOURS_PER_MONTH" environment variable to the number of hours
+you plan to work per month, then "tt log" will also print how many hours you
+have to work in average to meet the target. Example:
+
+  $ TT_HOURS_PER_MONTH=150 tt log -p my_job
+  ...
+  Remaining this month: 21d,  7:08h/d.
 
 =head2 register
 
