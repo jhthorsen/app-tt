@@ -272,10 +272,10 @@ sub _edit_with_editor {
 
   my $fh = File::Temp->new;
   printf $fh "# %s\n", $event->{path};
-  for my $k (qw(project tags start stop user)) {
+  for my $k (qw(project tags description start stop user)) {
     $event->{$k} = join ', ', @{$event->{$k} || []} if $k eq 'tags';
     $event->{$k} = $event->{$k}->datetime if $k eq 'start' or $k eq 'stop' and $event->{$k};
-    printf $fh "%-8s %s\n", "$k:", $event->{$k} // '';
+    printf $fh "%-12s %s\n", "$k:", $event->{$k} // '';
   }
 
   close $fh;
