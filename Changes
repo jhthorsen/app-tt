@@ -1,5 +1,10 @@
 Revision history for perl distribution App-tt
 
+0.13 Not Released
+ - Can also edit description interactive
+ - Mass edit can take --year and --month
+ - Mass edit can be interactive
+
 0.12 2020-04-02T15:36:31+0900
  - Add missing dependency List::Util 1.45+
 
