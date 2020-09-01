@@ -1,6 +1,6 @@
 Revision history for perl distribution App-tt
 
-0.13 Not Released
+0.13 2020-09-02T08:46:36+0900
  - Add support for "TT_COLUMNS=... tt export"
  - Can also edit description interactive
  - Mass edit can take --year and --month
