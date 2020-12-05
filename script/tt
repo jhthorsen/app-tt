@@ -527,11 +527,13 @@ sub _save {
     return 0;
   }
 
+  $event->{duration}
+    = $self->_hms_duration($event->{seconds});    # Used by App::TimeTracker::Data::Task
+
   my %event = %$event;
   delete $event{path};
   $event{start} = $event->{start}->datetime if $event->{start};
   $event{stop}  = $event->{stop}->datetime  if $event->{stop};
-  $event{duration} = $self->_hms_duration($event{seconds});   # Used by App::TimeTracker::Data::Task
 
   $event->{path} = $self->_trc_path($event->{project}, $event->{start});
   File::Path::make_path(dirname($event->{path})) unless -d dirname($event->{path});
