@@ -30,24 +30,9 @@ The application is built up by specifying an command and optional arguments.
 Here is a list of example usages, but you can get more details by adding "-h"
 after each command.
 
-  # Register forgotten time
-  $ tt register 2020-01-01T09:00:00 17:00:00 -p "project-name"
-  $ tt register 2020-01-01T09:00:00 17:00:00 -p "project-name" -t "tag1,tag2"
-  $ tt register 2020-01-01T09:00:00 17:00:00 -p "project-name" -d "description" -t "tag1,tag2"
-
-  # Edit the last entry, or a specific file
-  $ tt edit
-  $ tt edit ~/.TimeTracker/2020/01/20200106-150000_nms.trc
-
-  # See the log
-  $ tt log
-  $ tt log -0year                  # Log for this year
-  $ tt log -1year -t meetings      # Log for last year, for tag "meetings"
-  $ tt log -p project-name -1month # Log for last month, for project "project-name"
-  $ tt log -2                      # Log for two months back
-
   # Start tracking time
   $ tt start
+  $ tt start -p project-name
   $ tt start -p project-name -t tag1,tag2
   $ tt start -p project-name -t tag1,tag2 09:03
 
@@ -59,6 +44,23 @@ after each command.
   # in case you forgot to stop it.
   $ tt stop
   $ tt stop 18:04
+
+  # See the log
+  $ tt log
+  $ tt log -0year                  # Log for this year
+  $ tt log -1year -t meetings      # Log for last year, for tag "meetings"
+  $ tt log -p project-name -1month # Log for last month, for project "project-name"
+  $ tt log -2                      # Log for two months back
+  $ tt export -1                   # Export as CSV
+
+  # Edit the last entry, or a specific file
+  $ tt edit
+  $ tt edit ~/.TimeTracker/2020/01/20200106-150000_nms.trc
+
+  # Register forgotten time
+  $ tt register 2020-01-01T09:00:00 17:00:00 -p "project-name"
+  $ tt register 2020-01-01T09:00:00 17:00:00 -p "project-name" -t "tag1,tag2"
+  $ tt register 2020-01-01T09:00:00 17:00:00 -p "project-name" -d "description" -t "tag1,tag2"
 
 Basic usage;
 
