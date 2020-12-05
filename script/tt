@@ -637,10 +637,8 @@ sub _time {
   $t{M} //= defined $t{H} ? 0 : $ref->min;
   $t{H} //= $ref->hour;
 
-  if ($t{m} <= 0) {
-    $t{m} = 12 - $t{m};
-    $t{Y}--;
-  }
+  @t{qw(m Y)} = (12 - $t{m}, $t{Y} - 1) if $t{m} <= 0;
+  @t{qw(m Y)} = (1, $t{Y} + 1) if $t{m} > 12;
 
   eval {
     $t{iso} = sprintf '%s-%02s-%02sT%02s:%02s:%02s', @t{qw(Y m d H M S)};
