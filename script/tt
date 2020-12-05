@@ -5,16 +5,16 @@ BEGIN {
   }
 }
 use Applify;
-use Cwd 'abs_path';
+use Cwd ();
 use File::Basename;
 use File::Find;
 use File::HomeDir;
-use File::Path 'make_path';
+use File::Path;
 use File::Spec;
 use IO::Handle;
 use JSON::XS ();
-use List::Util 'uniq';
-use Scalar::Util 'blessed';
+use List::Util qw(uniq);
+use Scalar::Util qw(blessed);
 use Time::Piece;
 use Time::Seconds;
 
@@ -210,7 +210,7 @@ sub command_start {
 
   $self->_stop_previous(@args);
   return $! unless $self->_save($event);
-  _spurt($event->{path} => File::Spec->catfile($self->_root, 'previous'));
+  _spurt($event->{path} => $self->_path('previous'));
   $self->_say('Started working on project "%s" at %s.',
     $event->{project}, $event->{start}->hms(':'));
   return 0;
@@ -274,7 +274,7 @@ sub _edit_with_editor {
   }
 
   return $! unless $self->_save($event);
-  _spurt($event->{path} => File::Spec->catfile($self->_root, 'previous')) if $prev;
+  _spurt($event->{path} => $self->_path('previous')) if $prev;
   unlink $trc_file or die "rm $trc_file: $!" unless $trc_file eq $event->{path};
   return 0;
 }
@@ -303,7 +303,7 @@ sub _fill_log_days {
 
 sub _get_previous_event {
   my $self     = shift;
-  my $previous = File::Spec->catfile($self->_root, 'previous');
+  my $previous = $self->_path('previous');
   return {path => ''} unless -r $previous;
   my $trc_file = _slurp($previous);    # $ROOT/previous contains path to last .trc file
   return -r $trc_file ? $self->_load($trc_file) : {path => $trc_file};
@@ -377,12 +377,11 @@ sub _log {
 
   if ($res->{interval} =~ m!^y!) {
     $res->{when} = $self->_time(Y => $NOW->year + $res->{start_at}, m => 1, d => 1);
-    $res->{path} = File::Spec->catdir($self->_root, $res->{when}->year);
+    $res->{path} = $self->_path($res->{when}->year);
   }
   else {
     $res->{when} = $self->_time(m => $NOW->mon + $res->{start_at}, d => 1);
-    $res->{path}
-      = File::Spec->catdir($self->_root, $res->{when}->year, sprintf '%02s', $res->{when}->mon);
+    $res->{path} = $self->_path($res->{when}->year, sprintf '%02s', $res->{when}->mon);
   }
 
   -d $res->{path} and find {
@@ -445,15 +444,16 @@ sub _log_print_time_left {
   );
 }
 
+sub _path { File::Spec->catfile(shift->_root, @_) }
+
 sub _root {
   my $self = shift;
   return $self->{root} if $self->{root};
 
-  my $root = $ENV{TIMETRACKER_HOME};
-  $root ||= do {
-    my $home = File::HomeDir->my_home || File::Spec->curdir;
-    File::Spec->catdir($home, '.TimeTracker');
-  };
+  my $root
+    = $ENV{TT_HOME}
+    || $ENV{TIMETRACKER_HOME}
+    || File::Spec->catdir(File::HomeDir->my_home || File::Spec->curdir, '.TimeTracker');
 
   return $self->{root} = readlink($root) || $root;
 }
@@ -488,7 +488,7 @@ sub _mass_edit {
       no_chdir => 0,
       wanted   => sub {
         return unless $_ =~ m!^$re$!;
-        my %info = (file => abs_path $_);
+        my %info = (file => Cwd::abs_path($_));
         @info{qw(year month day date hms project)} = ($1, $2, $3, "$1$2$3", $4, $5);
         push @found, \%info;
       },
@@ -533,7 +533,7 @@ sub _save {
   $event{duration} = $self->_hms_duration($event{seconds});   # Used by App::TimeTracker::Data::Task
 
   $event->{path} = $self->_trc_path($event->{project}, $event->{start});
-  make_path(dirname($event->{path})) unless -d dirname($event->{path});
+  File::Path::make_path(dirname($event->{path})) unless -d dirname($event->{path});
   _spurt(JSON::XS::encode_json(\%event) => $event->{path});
   return 1;
 }
@@ -637,7 +637,7 @@ sub _trc_path {
   $project =~ s!\W!_!g;
   $file = sprintf '%s-%s_%s.trc', $t->ymd(''), $t->hms(''), $project;
 
-  return File::Spec->catfile($self->_root, $t->year, $month, $file);
+  return $self->_path($t->year, $month, $file);
 }
 
 app {
