@@ -28,12 +28,8 @@ version 'App::tt';
 
 our $NOW = localtime;
 
-$ENV{EDITOR}         ||= 'nano';
-$ENV{TT_ROUND_UP_AT} ||= 30;
 $SIG{__DIE__} = sub { Carp::confess($_[0]) }
   if DEBUG;
-
-$ENV{TIMETRACKER_MIN_TIME} ||= 300;
 
 subcommand edit => 'Edit a .trc file' => sub {
   option str => month => 'Mass edit a month';
@@ -76,7 +72,7 @@ sub command_export {
   my $self = shift;
   my $res  = $self->_log(@_);
 
-  my @cols   = split /,/, $ENV{TT_COLUMNS} || 'date,project,hours,rounded,tags,description';
+  my @cols   = split /,/, $self->config('export_columns');
   my $format = join ',', map {'"%s"'} @cols;
 
   $res->{rounded} = 0;
@@ -87,7 +83,8 @@ sub command_export {
     $event->{hours} = int($event->{seconds} / 3600);
     $event->{seconds} -= $event->{hours} * 3600;
     $event->{minutes} = int($event->{seconds} / 60);
-    $event->{rounded} = $event->{hours} + ($event->{minutes} >= $ENV{TT_ROUND_UP_AT} ? 1 : 0);
+    $event->{rounded}
+      = $event->{hours} + ($event->{minutes} >= $self->config('round_up_at') ? 1 : 0);
     $event->{hours} += sprintf '%.1f', $event->{minutes} / 60;
     $res->{rounded} += $event->{rounded};
 
@@ -206,6 +203,7 @@ sub command_start {
   $event->{project} ||= $self->project;
   $event->{project} ||= (grep {/^[A-Za-z0-9-]+$/} @args)[0];
   $event->{project} ||= basename(Cwd::getcwd) if -d '.git';
+  $event->{project} ||= $self->config('project');
   return $self->command_help('start') unless $event->{project};
 
   $self->_stop_previous(@args);
@@ -245,6 +243,33 @@ sub command_status {
   }
 }
 
+sub config {
+  my ($self, $key) = @_;
+
+  unless ($self->{config}) {
+    local %ENV = %ENV;
+    for my $path ($self->_path('config'), '.env') {
+      next unless -r $path;
+      open my $CONFIG, '<', $path or die qq{Can't open file "$path": $!};
+      while (my $line = readline $CONFIG) {
+        next unless $line =~ m!^(?:TT_)?(\w+)=(\S+)!;
+        $ENV{$1} = $2;
+        $self->{config}{lc($1)} = $2;
+      }
+    }
+
+    $self->{defaults} ||= {
+      editor          => $ENV{EDITOR}             || 'nano',
+      export_columns  => $ENV{TT_COLUMNS}         || 'date,project,hours,rounded,tags,description',
+      hours_per_month => $ENV{TT_HOURS_PER_MONTH} || 0,
+      min_time        => $ENV{TT_MIN_TIME}        || 300,
+      round_up_at     => $ENV{TT_ROUND_UP_AT}     || 30,
+    };
+  }
+
+  return $self->{config}{$key} // $self->{defaults}{$key} // die "Missing option '$key'.\n";
+}
+
 sub _edit_with_editor {
   require File::Temp;
   my ($self, $trc_file) = @_;
@@ -263,7 +288,7 @@ sub _edit_with_editor {
 
   close $fh;
   $self->_diag("Edit $event->{path}");
-  system $ENV{EDITOR} => "$fh";
+  system $self->config('editor') => "$fh";
 
   for (split /\n/, _slurp("$fh")) {
     my ($k, $v) = /^(\w+)\s*:\s*(.+)/ or next;
@@ -419,7 +444,7 @@ sub _log {
 
 sub _log_print_time_left {
   my ($self, $res) = @_;
-  return unless $ENV{TT_HOURS_PER_MONTH} and $res->{interval} eq 'month';
+  return unless $self->config('hours_per_month') and $res->{interval} eq 'month';
 
   my $start       = $self->_time(d => 1, H => 0, M => 0, S => 0);
   my $end         = $self->_time(d => 1, m => $start->mon + 1, H => 0, M => 0, S => 0);
@@ -434,7 +459,7 @@ sub _log_print_time_left {
   }
 
   my $remaining_days    = $total_days - $worked_days + ($NOW->hour > 12 ? 0 : 1);
-  my $total_seconds     = $ENV{TT_HOURS_PER_MONTH} * 3600;
+  my $total_seconds     = $self->config('hours_per_month') * 3600;
   my $remaining_seconds = $total_seconds - $res->{seconds};
 
   $self->_diag(
@@ -520,7 +545,7 @@ sub _save {
   if (my $duration = $event->{stop} && $event->{start} && $event->{stop} - $event->{start}) {
     $event->{seconds} = $duration->seconds;
   }
-  if ($event->{stop} and $event->{seconds} < $ENV{TIMETRACKER_MIN_TIME}) {
+  if ($event->{stop} and $event->{seconds} < $self->config('min_time')) {
     $self->_diag('Too short duration (%s)', $self->_hms_duration($event->{duration}));
     $! = 52;
     return 0;
@@ -571,8 +596,9 @@ sub _stop_previous {
   $event->{stop} = $self->_time(+(grep {/\d+\:/} @args)[0]);
 
   my $duration = $event->{stop} - $event->{start};
-  if ($duration->seconds < $ENV{TIMETRACKER_MIN_TIME}) {
-    $self->_say(qq(Dropping log event for "%s" since worked less than $ENV{TIMETRACKER_MIN_TIME}s.),
+  if ($duration->seconds < $self->config('min_time')) {
+    $self->_say(
+      qq(Dropping log event for "%s" since worked less than @{[$self->config('min_time')]}s.),
       $event->{project});
     unlink $event->{path} or die "rm $event->{path}: $!";
     return 52;

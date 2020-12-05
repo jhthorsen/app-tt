@@ -78,6 +78,27 @@ A more complex example:
   # you stopped working
   $ tt stop -t GITHUB-1005 "Today I was mostly in meetings" 15:24
 
+=head1 CONFIG
+
+Default configuration can be read from either C<$PWD/.env> or
+C<$HOME/.TimeTracker/config>. Here is an example config file with default
+settings:
+
+  # some comment
+  editor=nano
+  export_columns=date,project,hours,rounded,tags,description
+  hours_per_month=0  # Used to calculate how much you have to work
+  min_time=300       # Will drop the task on "tt stop" if started less than 300 seconds
+  round_up_at=30     # Used by the export comnmand to round hours
+
+Can also use the environment aliases:
+
+  EDITOR=vim
+  TT_COLUMNS=date,project
+  TT_HOURS_PER_MONTH=150
+  TT_MIN_TIME=600
+  TT_ROUND_UP_AT=15
+
 =head1 ACTIONS
 
 Each command can tak C<-h> for more details. Example:
