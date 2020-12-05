@@ -144,14 +144,14 @@ sub command_log {
 
 sub command_register {
   my ($self, $start, $stop) = @_;
-  return $self->command_help('register') unless $start and $stop and $self->project;
+  return $self->command_help('register') unless $start and $stop;
 
   $start = $self->_time(str => $start);
   $stop  = $self->_time(str => $stop, ref => $start);
 
   my %event = (
     __CLASS__   => 'App::TimeTracker::Data::Task',
-    project     => $self->project,
+    project     => $self->project || $self->config('project'),
     start       => $start,
     stop        => $stop,
     user        => scalar(getpwuid $<),
@@ -159,7 +159,7 @@ sub command_register {
     description => $self->description,
   );
 
-  my $trc_file = $self->_trc_path($self->project, $start);
+  my $trc_file = $self->_trc_path($event{project}, $start);
   if (-e $trc_file) {
     $self->_diag("$trc_file already exists.");
     return 1;
@@ -513,7 +513,7 @@ sub _save {
 
   $event->{__CLASS__}   ||= 'App::TimeTracker::Data::Task';
   $event->{description} ||= $self->description // '';
-  $event->{project}     ||= $self->project;
+  $event->{project}     ||= $self->project || $self->config('project');
   $event->{seconds}     ||= 0;
   $event->{tags}        ||= [uniq @{$event->{tags} || []}, $self->_tags];
   $event->{user}        ||= scalar(getpwuid $<);
