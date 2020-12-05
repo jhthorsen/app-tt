@@ -20,8 +20,14 @@ use Time::Seconds;
 
 use constant DEBUG => $ENV{APP_TT_DEBUG} || 0;
 
-option str => project => 'Project name. Normally autodetected', alias => 'p';
-option str => tag     => 'Tags for an event',                   alias => 't', n_of => '@';
+option str => project     => 'Project name. Normally autodetected', alias => 'p';
+option str => tag         => 'Tags for an event',                   alias => 't', n_of => '@';
+option str => description => 'Description for an event',            alias => 'd';
+
+option str => group_by => 'Group log output: --group-by day', alias => 'g';
+
+option str => month => 'Mass edit a month';
+option str => year  => 'Mass edit a year';
 
 documentation 'App::tt';
 version 'App::tt';
@@ -30,36 +36,6 @@ our $NOW = localtime;
 
 $SIG{__DIE__} = sub { Carp::confess($_[0]) }
   if DEBUG;
-
-subcommand edit => 'Edit a .trc file' => sub {
-  option str => month => 'Mass edit a month';
-  option str => year  => 'Mass edit a year';
-};
-
-subcommand export => 'Export log data as csv' => sub {
-  option str => group_by => 'Group log output: --group-by day', alias => 'g';
-};
-
-subcommand help => 'Show help for a command' => sub { };
-
-subcommand log => 'Show log data' => sub {
-  option str => group_by => 'Group log output: --group-by day', alias => 'g';
-};
-
-subcommand register => 'Register an event' => sub {
-  option str => description => 'Description for an event', alias => 'd';
-};
-
-subcommand start => 'Start tracking a new event' => sub {
-  option str => description => 'Description for an event', alias => 'd';
-};
-
-subcommand stop => 'Stop tracking' => sub {
-  option str => tag         => 'Tags for an event',        alias => 't', n_of => '@';
-  option str => description => 'Description for an event', alias => 'd';
-};
-
-subcommand status => 'Show current status' => sub { };
 
 sub command_edit {
   my $self = shift;
@@ -665,7 +641,10 @@ sub _trc_path {
 }
 
 app {
-  my $self = shift;
+  my ($self, $command) = (shift, shift);
   return $self->command_help($ENV{APP_TT_HELP}) if $ENV{APP_TT_HELP};
-  return $self->command_status;
+  return $self->command_status(@_)              if !$command or $command eq 'status';
+  my $method = $self->can("command_$command");
+  return $self->$method(@_) if $method;
+  die qq(Unknown command "$command".\n);
 };
