@@ -18,8 +18,9 @@ use JSON::XS ();
 use overload '@{}' => sub { [splitdir ${$_[0]}] }, '""' => sub { ${$_[0]} }, fallback => 1;
 
 sub new {
+  my $class = shift;
   my $value = @_ == 1 ? $_[0] : @_ > 1 ? catfile @_ : canonpath(Cwd::getcwd());
-  return bless \$value, ref $_[0] || $_[0];
+  return bless \$value, ref $class || $class;
 }
 
 sub basename  { File::Basename::basename ${shift()}, @_ }
@@ -30,10 +31,10 @@ sub make_path { File::Path::make_path(${$_[0]}, @_); shift }
 sub list_tree {
   my ($self, $cb) = (shift, shift);
   my %all;
-  my $wanted = sub { -d $File::Find::name or $all{$File::Find::name}++ };
+  my $wanted = sub { $all{$File::Find::name}++ unless -d $File::Find::name };
   find {wanted => $wanted, no_chdir => 1}, $$self if -d $$self;
   delete $all{$$self};
-  return map { my $f = $self->new(canonpath $_); $cb ? $self->$cb($f) : $f } sort keys %all;
+  return map { my $f = $self->new(canonpath $_); $cb ? $cb->($f) : $f } sort keys %all;
 }
 
 sub slurp {
