@@ -4,5 +4,6 @@ requires "Applify"       => "0.21";
 requires "File::HomeDir" => "1.00";
 requires "JSON::XS"      => "3.00";
 requires "List::Util"    => "1.45";
+requires "Term::ReadKey" => "2.00";
 
 test_requires "Test::More" => "0.88";

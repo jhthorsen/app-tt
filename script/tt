@@ -15,14 +15,18 @@ use IO::Handle;
 use JSON::XS ();
 use List::Util qw(uniq);
 use Scalar::Util qw(blessed);
+use Term::ANSIColor qw(color);
+use Term::ReadKey qw(GetTerminalSize);
 use Time::Piece;
 use Time::Seconds;
 
 use constant DEBUG => $ENV{APP_TT_DEBUG} || 0;
 
+$ENV{COLUMNS} ||= (GetTerminalSize)[0] || 80;
+
 option str => project     => 'Project name. Normally autodetected', alias => 'p';
-option str => tag         => 'Tags for an event',                   alias => 't', n_of => '@';
-option str => description => 'Description for an event',            alias => 'd';
+option str => tag         => 'Tags for an event',        alias => 't', n_of => '@';
+option str => description => 'Description for an event', alias => 'd';
 
 option str => group_by => 'Group log output: --group-by day', alias => 'g';
 
@@ -40,7 +44,7 @@ $SIG{__DIE__} = sub { Carp::confess($_[0]) }
 sub command_edit {
   my $self = shift;
   return $self->_edit_with_editor($_[0]) if @_ and -f $_[0];    # Edit a given file
-  return $self->_mass_edit(@_) if $self->year or $self->month or !-t STDIN;
+  return $self->_mass_edit(@_)           if $self->year or $self->month or !-t STDIN;
   return $self->_edit_with_editor;
 }
 
@@ -116,10 +120,18 @@ sub command_log {
   my $self = shift;
   my $res  = $self->_log(@_);
 
+  $res->{max_project_chr} = 7 if $res->{max_project_chr} < 7;
+
+  $self->_diag(
+    "\n %CM%C_Mon%CX  %CM%C_Date%CX   %CM%C_Start%CX  %CM%C_Duration%CX  %CM%C_%-$res->{max_project_chr}s%CX  %CM%C_Tags%s%CX",
+    "Project",
+    " " x ($ENV{COLUMNS} - 50),
+  );
+
   for my $event (sort { $a->{start} <=> $b->{start} } @{$res->{log}}) {
     my $start = $event->{start};
     $self->_say(
-      "%3s %2s %02s:%02s  %5s  %-$res->{max_project_chr}s  %s",
+      " %3s    %2s   %02s:%02s     %5s  %-$res->{max_project_chr}s  %s",
       $start->month,
       $start->mday,
       $start->hour,
@@ -131,13 +143,14 @@ sub command_log {
   }
 
   $self->_diag(
-    "\nTotal for %s events since %s: %s",
+    "\n\n Total for %s events since %CB%s%CX: %CM%10s%CX",
     $res->{events},
     join(' ', $res->{when}->month, $res->{when}->year),
     $self->_hms_duration($res->{seconds}, 'hms'),
   );
 
   $self->_log_print_time_left($res);
+  $self->_diag("");
 
   return 0;
 }
@@ -165,7 +178,7 @@ sub command_register {
     return 1;
   }
 
-  $self->_say('Registered "%s" at %s with duration %s', @event{qw(project start duration)})
+  $self->_say('%CGRegistered %s at %s with duration %s.%CX', @event{qw(project start duration)})
     if $self->_save(\%event);
   return $!;
 }
@@ -185,7 +198,7 @@ sub command_start {
   $self->_stop_previous(@args);
   return $! unless $self->_save($event);
   _spurt($event->{path} => $self->_path('previous'));
-  $self->_say('Started working on project "%s" at %s.',
+  $self->_say("\n %CGStarted working on project %s at %C_%s%CX%CG.%CX\n",
     $event->{project}, $event->{start}->hms(':'));
   return 0;
 }
@@ -193,7 +206,7 @@ sub command_start {
 sub command_stop {
   my $self      = shift;
   my $exit_code = $self->_stop_previous(@_);
-  $self->_diag("No previous event to stop.") if $exit_code == 3;
+  $self->_diag("%CRNo previous event to stop.%CX") if $exit_code == 3;
   return $exit_code;
 }
 
@@ -203,17 +216,17 @@ sub command_status {
   warn "[APP_TT] status $event->{path}\n" if DEBUG;
 
   if (!$event->{start}) {
-    $self->_say('No event is being tracked.');
+    $self->_say("\n %CRNo event is being tracked.%CX\n");
     return 3;    # No such process
   }
   elsif ($event->{stop}) {
-    $self->_say('Stopped working on "%s" at %s after %s',
+    $self->_say("\n %CRStopped working on %s at %C_%s%CX%CR after %C_%s.%CX\n",
       $event->{project}, $event->{stop}, $self->_hms_duration($event->{seconds}));
     return 0;
   }
   else {
     my $duration = $NOW - $event->{start} + $NOW->tzoffset;
-    $self->_say('Been working on "%s", for %s',
+    $self->_say("\n %CGBeen working on %s for %C_%s.%CX\n",
       $event->{project}, $self->_hms_duration($duration, 'hms'));
     return 0;
   }
@@ -248,7 +261,7 @@ sub config {
 
 sub _edit_with_editor {
   require File::Temp;
-  my ($self, $trc_file) = @_;
+  my ($self,  $trc_file) = @_;
   my ($event, $prev) = $trc_file ? ($self->_load($trc_file), 0) : ($self->_get_previous_event, 1);
 
   $trc_file = $event->{path} //= 'Not found';
@@ -268,9 +281,9 @@ sub _edit_with_editor {
 
   for (split /\n/, _slurp("$fh")) {
     my ($k, $v) = /^(\w+)\s*:\s*(.+)/ or next;
-    $v = [grep {length} split /[\s,]+/, $v] if $k eq 'tags';
-    $v = $self->_time(str => $v)                         if $k eq 'start';
-    $v = $self->_time(str => $v, ref => $event->{start}) if $k eq 'stop';
+    $v           = [grep {length} split /[\s,]+/, $v] if $k eq 'tags';
+    $v           = $self->_time(str => $v)                         if $k eq 'start';
+    $v           = $self->_time(str => $v, ref => $event->{start}) if $k eq 'stop';
     $event->{$k} = $v;
   }
 
@@ -280,14 +293,26 @@ sub _edit_with_editor {
   return 0;
 }
 
+sub _colorize {
+  return shift unless -t STDOUT;
+  local $_ = shift;
+  s!\%CB!{color 'bold'}!ge;
+  s!\%CG!{color 'green'}!ge;
+  s!\%CM!{color 'magenta'}!ge;
+  s!\%CR!{color 'red'}!ge;
+  s!\%CX!{color 'reset'}!ge;
+  s!\%C_!{color 'underline'}!ge;
+  return $_;
+}
+
 sub _diag {
-  my ($self, $format) = (shift, shift);
+  my ($self, $format) = (shift, _colorize(shift));
   return warn "$format\n" unless @_;
   return warn sprintf "$format\n", @_;
 }
 
 sub _say {
-  my ($self, $format) = (shift, shift);
+  my ($self, $format) = (shift, _colorize(shift));
   print "$format\n" unless @_;
   print sprintf "$format\n", @_ if @_;
 }
@@ -345,8 +370,8 @@ sub _hms_duration {
   $seconds -= $minutes * 60;
 
   return sprintf '%s:%02s:%02s', $hours, $minutes, $seconds if !$sep;
-  return sprintf '%2s:%02s', $hours, $minutes if $sep eq 'hm';
-  return sprintf '%sh %sm %ss', $hours, $minutes, $seconds;
+  return sprintf '%2s:%02s',     $hours, $minutes if $sep eq 'hm';
+  return sprintf '%sh %sm %ss',  $hours, $minutes, $seconds;
 }
 
 sub _load {
@@ -438,8 +463,10 @@ sub _log_print_time_left {
   my $total_seconds     = $self->config('hours_per_month') * 3600;
   my $remaining_seconds = $total_seconds - $res->{seconds};
 
+  my $padding = 7 + length join ' ', $res->{when}->month, $res->{when}->year;
   $self->_diag(
-    'Remaining this month: %sd, %sh/d.',
+    " Remaining this month:%${padding}s %CM%sd, %sh/d%CX",
+    '',
     $remaining_days > 0 ? $remaining_days : 0,
     $self->_hms_duration($remaining_seconds / ($remaining_days <= 0 ? 1 : $remaining_days), 'hm'),
   );
@@ -576,14 +603,15 @@ sub _stop_previous {
   my $duration = $event->{stop} - $event->{start};
   if ($duration->seconds < $self->config('min_time')) {
     $self->_say(
-      qq(Dropping log event for "%s" since worked less than @{[$self->config('min_time')]}s.),
-      $event->{project});
+      qq(\n %CRDropping log event for %s since worked less than @{[$self->config('min_time')]}s.%CX\n),
+      $event->{project}
+    );
     unlink $event->{path} or die "rm $event->{path}: $!";
     return 52;
   }
 
   if ($self->_save($event)) {
-    $self->_say('Stopped working on "%s" after %s',
+    $self->_say("\n %CRStopped working on %s after %s.%CX\n",
       $event->{project}, $self->_hms_duration($duration, 'hms'));
     return 0;
   }
@@ -612,7 +640,7 @@ sub _time {
   $t{m} //= $ref->mon;
   $t{d} //= $ref->mday;
   $t{S} //= defined $t{H} || defined $t{M} ? 0 : $ref->second;
-  $t{M} //= defined $t{H} ? 0 : $ref->min;
+  $t{M} //= defined $t{H}                  ? 0 : $ref->min;
   $t{H} //= $ref->hour;
 
   @t{qw(m Y)} = (12 - $t{m}, $t{Y} - 1) if $t{m} <= 0;
