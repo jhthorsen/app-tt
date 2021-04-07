@@ -133,7 +133,7 @@ sub command_export {
 
   $self->_print(
     '> Exact hours: %s. Rounded hours: %s Events: %s',
-    $self->_hms_duration($res->{seconds}, 'hm'),
+    $self->_duration($res->{seconds}, 'hm'),
     @$res{qw(rounded events)},
   );
 
@@ -164,17 +164,16 @@ sub command_log {
   my $self = shift;
   my $res  = $self->_log(@_);
 
-  my @table;
-  push @table, [qw(Mon Date Start Duration Project Tags)];
+  my @table = (['']);
+  push @table, [map {"%CM%CU$_%CX"} qw(Mon Date Start Duration Project Tags)];
 
   for my $event (sort { $a->{start} <=> $b->{start} } @{$res->{log}}) {
     my $start = $event->{start};
     push @table,
       [
-      $start->month,
-      $start->mday,
-      sprintf('%02s:%02s', $start->hour, $start->minute),
-      $self->_hms_duration($event->{seconds}, 'hm'),
+      $start->month, $start->mday,
+      sprintf('%2s:%02s', $start->hour, $start->minute),
+      $self->_duration($event->{seconds}, 'hm'),
       $event->{project} || '---',
       join(',', @{$event->{tags}}),
       ];
@@ -182,21 +181,19 @@ sub command_log {
 
   $self->_print(\@table);
 
+  @table = (['']);
+  push @table, ['Total events', $res->{events}];
+  push @table, ['Total time',   $self->_duration($res->{seconds}, 'hms')];
+
   my ($time_left, @time_left) = ('');
   if ($self->config('hours_per_month') and $res->{interval} eq 'month') {
-    my ($remaining_days, $remaining_seconds) = $self->_time_left($res);
-    my $padding = 6 + length join ' ', $res->{when}->month, $res->{when}->year;
-    $time_left = "\nRemaining this month:%${padding}s %CM%sd, %sh/d%CX";
-    push @time_left, '', $remaining_days > 0 ? $remaining_days : 0,
-      $self->_hms_duration($remaining_seconds / ($remaining_days <= 0 ? 1 : $remaining_days), 'hm');
+    my ($days, $sec) = $self->_time_left($res);
+    push @table, ['Remaining days', $days > 0 ? $days : 0];
+    push @table,
+      ['Remaining time', $self->_duration($sec / ($days <= 0 ? 1 : $days), '-hm') . '/day'];
   }
 
-  $self->_print(
-    "> Total for %s events since %CU%s%CX: %CM%10s%CX$time_left",
-    $res->{events},
-    join(' ', $res->{when}->month, $res->{when}->year),
-    $self->_hms_duration($res->{seconds}, 'hms'), @time_left,
-  );
+  $self->_print(\@table);
 
   return 0;
 }
@@ -267,13 +264,13 @@ sub command_status {
   }
   elsif ($event->{stop}) {
     $self->_print('> %CGStopped working on %s at %CU%s%CX%CR after %CU%s.%CX',
-      $event->{project}, $event->{stop}, $self->_hms_duration($event->{seconds}));
+      $event->{project}, $event->{stop}, $self->_duration($event->{seconds}));
     return 0;
   }
   else {
     my $duration = $NOW - $event->{start} + $NOW->tzoffset;
     $self->_print('> %CGBeen working on %s for %CU%s%CX%CG.%CX',
-      $event->{project}, $self->_hms_duration($duration, 'hms'));
+      $event->{project}, $self->_duration($duration, 'hms'));
     return 0;
   }
 }
@@ -287,7 +284,7 @@ sub config {
       next unless -r $path;
       open my $CONFIG, '<', $path or die qq{Can't open file "$path": $!};
       while (my $line = readline $CONFIG) {
-        next unless $line =~ m!^(?:TT_)?(\w+)=(\S+)!;
+        next unless $line =~ m!^(?:TT_)?(\w+)=(.+)!;
         $ENV{$1} = $2;
         $self->{config}{lc($1)} = $2;
       }
@@ -351,16 +348,13 @@ sub _print {
     for my $row (@$format) {
       for my $i (0 .. $#$row) {
         ($row->[$i] //= '') =~ y/\r\n//d;
-        my $len = length $row->[$i];
+        my $len = length $row->[$i] =~ s!%C[A-Z]!!gr;
         $spec[$i] = $len if $len >= ($spec[$i] // 0);
       }
     }
 
-    my $header = shift @$format;
-    my @fm     = (map({"\%-${_}s"} @spec[0 .. $#spec - 1]), '%s');
+    my @fm = (map({"\%-${_}s"} @spec[0 .. $#spec - 1]), '%s');
     $format = join '', map { sprintf join('  ', @margin, @fm[0 .. $#$_]) . "\n", @$_ } @$format;
-    $format
-      = "\n" . sprintf(join('  ', @margin, map {"%%CM%%CU$_%%CX"} @fm), @$header) . "\n$format";
   }
 
   my $fh = \*STDOUT;
@@ -425,7 +419,7 @@ sub _group_by_day {
   ];
 }
 
-sub _hms_duration {
+sub _duration {
   my ($self, $duration, $sep) = @_;
   my $seconds = int(ref $duration ? $duration->seconds : $duration);
   my ($hours, $minutes);
@@ -436,6 +430,7 @@ sub _hms_duration {
   $seconds -= $minutes * 60;
 
   return sprintf '%s:%02s:%02s', $hours, $minutes, $seconds if !$sep;
+  return sprintf '%s:%02s',      $hours, $minutes if $sep eq '-hm';
   return sprintf '%2s:%02s',     $hours, $minutes if $sep eq 'hm';
   return sprintf '%sh %sm %ss',  $hours, $minutes, $seconds;
 }
@@ -555,13 +550,12 @@ sub _save {
     $event->{seconds} = $duration->seconds;
   }
   if ($event->{stop} and $event->{seconds} < $self->config('min_time')) {
-    $self->_print('! Too short duration (%s)', $self->_hms_duration($event->{duration}));
+    $self->_print('! Too short duration (%s)', $self->_duration($event->{duration}));
     $! = 52;
     return 0;
   }
 
-  $event->{duration}
-    = $self->_hms_duration($event->{seconds});    # Used by App::TimeTracker::Data::Task
+  $event->{duration} = $self->_duration($event->{seconds});   # Used by App::TimeTracker::Data::Task
 
   my %event = %$event;
   delete $event{path};
@@ -599,7 +593,7 @@ sub _stop_previous {
 
   if ($self->_save($event)) {
     $self->_print('> Stopped working on %s after %s.',
-      $event->{project}, $self->_hms_duration($duration, 'hms'));
+      $event->{project}, $self->_duration($duration, 'hms'));
     return 0;
   }
 
