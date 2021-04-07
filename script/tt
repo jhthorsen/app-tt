@@ -204,34 +204,26 @@ sub command_register {
   $start = $self->_time(str => $start);
   $stop  = $self->_time(str => $stop, ref => $start);
 
-  my %event = (
-    __CLASS__   => 'App::TimeTracker::Data::Task',
-    project     => $self->project || $self->config('project'),
-    start       => $start,
-    stop        => $stop,
-    user        => scalar(getpwuid $<),
-    tags        => [$self->_tags],
-    description => $self->description,
-  );
-
-  my $trc_file = $self->_trc_path($event{project}, $start);
+  my $event    = $self->_fill_event({start => $start, stop => $stop});
+  my $trc_file = $self->_trc_path($event->{project}, $start);
   if (-e $trc_file) {
     $self->_print("! $trc_file already exists.");
     return 1;
   }
 
-  $self->_print('Registered %s at %s with duration %s.', @event{qw(project start duration)})
-    if $self->_save(\%event);
+  $self->_print('Registered %s at %s with duration %s.', @$event{qw(project start duration)})
+    if $self->_save($event);
   return $!;
 }
 
 sub command_start {
   my ($self, @args) = @_;
 
-  my $event = {};
-  $event->{start} = $self->_time(+(grep {/\d+\:/} @args)[0]);
+  my $event
+    = $self->_fill_event({
+    project => $self->project, start => $self->_time(+(grep {/\d+\:/} @args)[0]),
+    });
 
-  $event->{project} ||= $self->project;
   $event->{project} ||= (grep {/^[A-Za-z0-9-]+$/} @args)[0];
   $event->{project} ||= App::tt::file->new->basename if -d '.git';
   $event->{project} ||= $self->config('project');
@@ -332,6 +324,17 @@ sub _edit_with_editor {
   $self->root->child('previous')->spurt($event->{path}) if $prev;
   unlink $trc_file or die "rm $trc_file: $!" unless $trc_file eq $event->{path};
   return 0;
+}
+
+sub _fill_event {
+  my ($self, $event) = @_;
+  $event->{__CLASS__}   ||= 'App::TimeTracker::Data::Task';
+  $event->{project}     ||= $self->project || $self->config('project');
+  $event->{seconds}     ||= 0;
+  $event->{user}        ||= scalar(getpwuid $<);
+  $event->{tags}        ||= [$self->_tags];
+  $event->{description} ||= $self->description // '';
+  return $event;
 }
 
 sub _print {
@@ -504,8 +507,8 @@ sub _mass_edit {
 
   $self->year($NOW->year) if $self->month and !$self->year;
   my $path = $self->root;
-  $path = App::tt::file->new($path, $self->year) if $self->year;
-  $path = App::tt::file->new($path, sprintf '%02s', $self->month) if $self->month;
+  $path = $path->child($self->year)                  if $self->year;
+  $path = $path->child(sprintf '%02s', $self->month) if $self->month;
 
   my $re = '';
   $re .= sprintf '(%s)',   $self->year  || '\d{4}';    # (year)     = ($1)
@@ -525,7 +528,7 @@ sub _mass_edit {
 
   $path->list_tree(sub {
     my %info = (file => shift);
-    return unless $info{file} =~ m!^$re$!;
+    return unless $info{file} =~ m!$re$!;
     @info{qw(year month day date hms project)} = ($1, $2, $3, "$1$2$3", $4, $5);
     $self->command_edit($info{file}), next unless $code;
     my $event = $self->_load($info{file});
@@ -539,13 +542,7 @@ sub _mass_edit {
 
 sub _save {
   my ($self, $event) = @_;
-
-  $event->{__CLASS__}   ||= 'App::TimeTracker::Data::Task';
-  $event->{description} ||= $self->description // '';
-  $event->{project}     ||= $self->project || $self->config('project');
-  $event->{seconds}     ||= 0;
-  $event->{tags}        ||= [uniq @{$event->{tags} || []}, $self->_tags];
-  $event->{user}        ||= scalar(getpwuid $<);
+  $event = $self->_fill_event($event);
 
   if (my $duration = $event->{stop} && $event->{start} && $event->{stop} - $event->{start}) {
     $event->{seconds} = $duration->seconds;
