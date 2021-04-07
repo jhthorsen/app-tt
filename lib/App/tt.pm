@@ -93,13 +93,6 @@ settings:
   min_time=300       # Will drop the task on "tt stop" if started less than 300 seconds
   round_up_at=30     # Used by the export comnmand to round hours
 
-  # Experimental color support
-  # Change the values to "reset" to disable colors
-  color_green=green
-  color_magenta=magenta
-  color_red=red
-  color_underline=underline
-
 Can also use the environment aliases:
 
   EDITOR=vim

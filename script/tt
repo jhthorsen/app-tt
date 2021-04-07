@@ -59,14 +59,10 @@ use File::Temp ();
 use File::HomeDir;
 use List::Util qw(uniq);
 use Scalar::Util qw(blessed);
-use Term::ANSIColor qw(color);
-use Term::ReadKey qw(GetTerminalSize);
 use Time::Piece;
 use Time::Seconds;
 
 use constant DEBUG => $ENV{APP_TT_DEBUG} || 0;
-
-$ENV{COLUMNS} ||= (GetTerminalSize)[0] || 80;
 
 option str => project     => 'Project name. Normally autodetected', alias => 'p';
 option str => tag         => 'Tags for an event',                alias => 't', n_of => '@';
@@ -164,14 +160,13 @@ sub command_log {
   my $self = shift;
   my $res  = $self->_log(@_);
 
-  my @table = (['']);
-  push @table, [map {"%CM%CU$_%CX"} qw(Mon Date Start Duration Project Tags)];
-
+  my @table = (['Month', 'Date', 'Start', 'Duration', 'Project', 'Tags'], '-');
   for my $event (sort { $a->{start} <=> $b->{start} } @{$res->{log}}) {
     my $start = $event->{start};
     push @table,
       [
-      $start->month, $start->mday,
+      $start->month,
+      sprintf('%2s', $start->mday),
       sprintf('%2s:%02s', $start->hour, $start->minute),
       $self->_duration($event->{seconds}, 'hm'),
       $event->{project} || '---',
@@ -179,18 +174,22 @@ sub command_log {
       ];
   }
 
+  $res->{interval} eq 'month'
+    ? $self->_print('> Log for %s %s', map { $res->{when}->$_ } qw(fullmonth year))
+    : $self->_print('> Log for %s',    $res->{when}->year);
+  push @table, '-' if @table > 3;
   $self->_print(\@table);
 
-  @table = (['']);
-  push @table, ['Total events', $res->{events}];
-  push @table, ['Total time',   $self->_duration($res->{seconds}, 'hms')];
+  @table = ();
+  push @table, ['Total events', ':', $res->{events}];
+  push @table, ['Total time',   ':', $self->_duration($res->{seconds}, 'hms')];
 
   my ($time_left, @time_left) = ('');
   if ($self->config('hours_per_month') and $res->{interval} eq 'month') {
     my ($days, $sec) = $self->_time_left($res);
-    push @table, ['Remaining days', $days > 0 ? $days : 0];
+    push @table, ['Remaining days', ':', $days > 0 ? $days : 0];
     push @table,
-      ['Remaining time', $self->_duration($sec / ($days <= 0 ? 1 : $days), '-hm') . '/day'];
+      ['Remaining time', ':', $self->_duration($sec / ($days <= 0 ? 1 : $days), '-hm') . '/day'];
   }
 
   $self->_print(\@table);
@@ -241,7 +240,7 @@ sub command_start {
   $self->_stop_previous(@args);
   return $! unless $self->_save($event);
   $self->root->child('previous')->spurt($event->{path});
-  $self->_print('> %CGStarted working on project %s at %CU%s%CX%CG.%CX',
+  $self->_print('> Started working on project %s at %s.',
     $event->{project}, $event->{start}->hms(':'));
   return 0;
 }
@@ -263,13 +262,13 @@ sub command_status {
     return 3;    # No such process
   }
   elsif ($event->{stop}) {
-    $self->_print('> %CGStopped working on %s at %CU%s%CX%CR after %CU%s.%CX',
+    $self->_print('> Stopped working on %s at %s after %s.',
       $event->{project}, $event->{stop}, $self->_duration($event->{seconds}));
     return 0;
   }
   else {
     my $duration = $NOW - $event->{start} + $NOW->tzoffset;
-    $self->_print('> %CGBeen working on %s for %CU%s%CX%CG.%CX',
+    $self->_print('> Been working on %s for %s.',
       $event->{project}, $self->_duration($duration, 'hms'));
     return 0;
   }
@@ -291,10 +290,6 @@ sub config {
     }
 
     $self->{defaults} ||= {
-      color_green     => 'green',
-      color_magenta   => 'magenta',
-      color_red       => 'red',
-      color_underline => 'underline',
       editor          => $ENV{EDITOR}             || 'nano',
       export_columns  => $ENV{TT_COLUMNS}         || 'date,project,hours,rounded,tags,description',
       hours_per_month => $ENV{TT_HOURS_PER_MONTH} || 0,
@@ -340,43 +335,44 @@ sub _edit_with_editor {
 }
 
 sub _print {
-  my ($self, $format, @args) = @_;
+  my ($self, $data, @args) = @_;
 
-  if (ref $format eq 'ARRAY') {
-    my @margin = $PTY ? ('') : ();
-    my @spec;
-    for my $row (@$format) {
-      for my $i (0 .. $#$row) {
-        ($row->[$i] //= '') =~ y/\r\n//d;
-        my $len = length $row->[$i] =~ s!%C[A-Z]!!gr;
-        $spec[$i] = $len if $len >= ($spec[$i] // 0);
+  if (ref $data eq 'ARRAY') {
+    my $th     = $data->[0][-1] eq '{X}' ? 1    : 0;
+    my @margin = $PTY                    ? ('') : ();
+    my ($width, @lines, @spec);
+
+    for my $row (@$data) {
+      push @lines, $row and next unless ref $row eq 'ARRAY';
+      my $w = 0;
+      for my $col (0 .. $#$row) {
+        ($row->[$col] //= '') =~ y/\r\n//d;
+        my $len = length $row->[$col];
+        $spec[$col] = $len if $len >= ($spec[$col] // 0);
+        $w += $spec[$col] + 2;
       }
+      $width = $w if $w >= ($width // 0);
     }
 
+    $width -= 2;
     my @fm = (map({"\%-${_}s"} @spec[0 .. $#spec - 1]), '%s');
-    $format = join '', map { sprintf join('  ', @margin, @fm[0 .. $#$_]) . "\n", @$_ } @$format;
+    $data = join '', map {
+      ref $_
+        ? sprintf join('  ', @margin, @fm[0 .. $#$_]) . "\n", @$_
+        : '  ' . ($_ x $width) . "\n";
+    } @$data;
   }
 
   my $fh = \*STDOUT;
-  if ($format =~ s/^(>|!)\s//) {
+  if ($data =~ s/^(>|!)\s//) {
     my $type = $1;
-    $fh = \*STDERR;
-    if ($PTY) {
-      $format = "%CG$format%CX" if $type eq '>' and $format !~ m!%CX!;
-      $format = "%CR$format%CX" if $type eq '!' and $format !~ m!%CX!;
-      $format = "\n$format\n";
-      $format =~ s!\n!\n  !g;
-    }
+    $fh   = \*STDERR;
+    $data = "\n$data\n";
+    $data =~ s!\n!\n  !g if $PTY;
   }
 
-  $format =~ s!\%CG!{$PTY ? color($self->config('color_green')) : ''}!ge;
-  $format =~ s!\%CM!{$PTY ? color($self->config('color_magenta')) : ''}!ge;
-  $format =~ s!\%CR!{$PTY ? color($self->config('color_red')) : ''}!ge;
-  $format =~ s!\%CX!{$PTY ? color('reset') : ''}!ge;
-  $format =~ s!\%CU!{$PTY ? color($self->config('color_underline')) : ''}!ge;
-
-  return print {$fh} "$format\n" if @_ == 3;
-  return printf {$fh} "$format\n", @args;
+  return print {$fh} "$data\n" if @_ == 2;
+  return printf {$fh} "$data\n", @args;
 }
 
 sub _fill_log_days {
