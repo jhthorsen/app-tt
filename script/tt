@@ -185,7 +185,7 @@ sub command_log {
   my ($time_left, @time_left) = ('');
   if ($self->config('hours_per_month') and $res->{interval} eq 'month') {
     my ($remaining_days, $remaining_seconds) = $self->_time_left($res);
-    my $padding = 7 + length join ' ', $res->{when}->month, $res->{when}->year;
+    my $padding = 6 + length join ' ', $res->{when}->month, $res->{when}->year;
     $time_left = "\nRemaining this month:%${padding}s %CM%sd, %sh/d%CX";
     push @time_left, '', $remaining_days > 0 ? $remaining_days : 0,
       $self->_hms_duration($remaining_seconds / ($remaining_days <= 0 ? 1 : $remaining_days), 'hm');
