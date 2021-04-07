@@ -15,6 +15,22 @@ test_time('9-3T23',              '09-03T23:00:00');
 test_time('6:5',                 'T06:05:00');
 test_time('09:04:01',            'T09:04:01');
 
+my $home = $tt->home;
+
+{
+  local $ENV{TT_HOME} = '/tmp/tt';
+  delete $tt->{home};
+  is $tt->home, '/tmp/tt', 'TIMETRACKER_HOME';
+  isnt $tt->home, $home, 'not default home';
+}
+
+{
+  local $ENV{TIMETRACKER_HOME} = '/tmp/tt';
+  delete $tt->{home};
+  is $tt->home, '/tmp/tt', 'TIMETRACKER_HOME';
+  isnt $tt->home, $home, 'not default home';
+}
+
 done_testing;
 
 sub test_time {

@@ -59,7 +59,7 @@ sub spurt {
 package main;
 use Applify;
 use File::Temp ();
-use List::Util qw(uniq);
+use List::Util qw(first uniq);
 use Scalar::Util qw(blessed);
 use Time::Piece;
 use Time::Seconds;
@@ -76,18 +76,19 @@ option str => year        => 'Mass edit a year';
 documentation 'App::tt';
 version 'App::tt';
 
-our $PTY = -t STDOUT;
+our $PTY = $ENV{TT_PTY} || -t STDOUT;
 our $NOW = localtime;
 
 $SIG{__DIE__} = sub { Carp::confess($_[0]) }
   if DEBUG;
 
 # Attributes
-sub root {
-  shift->{root}
+sub home {
+  shift->{home}
     //= App::tt::file->new($ENV{TT_HOME} || $ENV{TIMETRACKER_HOME} || ($ENV{HOME}, '.TimeTracker'));
 }
 
+# Commands
 sub command_edit {
   my $self = shift;
   return $self->_edit_with_editor($_[0]) if @_ and -f $_[0];    # Edit a given file
@@ -128,7 +129,7 @@ sub command_export {
   }
 
   $self->_print(
-    '> Exact hours: %s. Rounded hours: %s Events: %s',
+    '2> Exact hours: %s. Rounded hours: %s. Events: %s.',
     $self->_duration($res->{seconds}, 'hm'),
     @$res{qw(rounded events)},
   );
@@ -175,8 +176,8 @@ sub command_log {
   }
 
   $res->{interval} eq 'month'
-    ? $self->_print('> Log for %s %s', map { $res->{when}->$_ } qw(fullmonth year))
-    : $self->_print('> Log for %s',    $res->{when}->year);
+    ? $self->_print('1> Log for %s %s', map { $res->{when}->$_ } qw(fullmonth year))
+    : $self->_print('1> Log for %s',    $res->{when}->year);
   push @table, '-' if @table > 3;
   $self->_print(\@table);
 
@@ -211,36 +212,31 @@ sub command_register {
     return 1;
   }
 
-  $self->_print('Registered %s at %s with duration %s.', @$event{qw(project start duration)})
+  $self->_print('Registered "%s" at %s with duration %s.', @$event{qw(project start duration)})
     if $self->_save($event);
   return $!;
 }
 
 sub command_start {
   my ($self, @args) = @_;
-
   my $event
     = $self->_fill_event({
-    project => $self->project, start => $self->_time(+(grep {/\d+\:/} @args)[0]),
+    project => (first {/^[A-Za-z0-9-]+$/} @args), start => $self->_time(first {/\d+\:/} @args),
     });
 
-  $event->{project} ||= (grep {/^[A-Za-z0-9-]+$/} @args)[0];
-  $event->{project} ||= App::tt::file->new->basename if -d '.git';
-  $event->{project} ||= $self->config('project');
-  return $self->command_help('start') unless $event->{project};
+  return $self->command_help('start') unless $event->{project} and $event->{start};
 
   $self->_stop_previous(@args);
   return $! unless $self->_save($event);
-  $self->root->child('previous')->spurt($event->{path});
-  $self->_print('> Started working on project %s at %s.',
-    $event->{project}, $event->{start}->hms(':'));
+  $self->home->child('previous')->spurt($event->{path});
+  $self->_print('1> Started "%s" at %s.', $event->{project}, $event->{start}->hms(':'));
   return 0;
 }
 
 sub command_stop {
   my $self      = shift;
   my $exit_code = $self->_stop_previous(@_);
-  $self->_print('! No previous event to stop.') if $exit_code == 3;
+  $self->_print('! No event to stop.') if $exit_code == 3;
   return $exit_code;
 }
 
@@ -250,18 +246,23 @@ sub command_status {
   warn "[APP_TT] status $event->{path}\n" if DEBUG;
 
   if (!$event->{start}) {
-    $self->_print('! No event is being tracked.');
+    $self->_print('1> No event is being tracked.');
     return 3;    # No such process
   }
   elsif ($event->{stop}) {
-    $self->_print('> Stopped working on %s at %s after %s.',
-      $event->{project}, $event->{stop}, $self->_duration($event->{seconds}));
+    $self->_print(
+      '1> Stopped "%s" at %s after %s.',
+      @$event{qw(project stop)},
+      $self->_duration($event->{seconds}, 'hms')
+    );
     return 0;
   }
   else {
     my $duration = $NOW - $event->{start} + $NOW->tzoffset;
-    $self->_print('> Been working on %s for %s.',
-      $event->{project}, $self->_duration($duration, 'hms'));
+    $self->_print(
+      '1> Tracking "%s" for %s since %s.', $event->{project},
+      $self->_duration($duration, 'hms'),  $event->{start}->hms(':')
+    );
     return 0;
   }
 }
@@ -271,7 +272,7 @@ sub config {
 
   unless ($self->{config}) {
     local %ENV = %ENV;
-    for my $path ($self->root->child('config'), '.env') {
+    for my $path ($self->home->child('config'), '.env') {
       next unless -r $path;
       open my $CONFIG, '<', $path or die qq{Can't open file "$path": $!};
       while (my $line = readline $CONFIG) {
@@ -321,19 +322,25 @@ sub _edit_with_editor {
   }
 
   return $! unless $self->_save($event);
-  $self->root->child('previous')->spurt($event->{path}) if $prev;
+  $self->home->child('previous')->spurt($event->{path}) if $prev;
   unlink $trc_file or die "rm $trc_file: $!" unless $trc_file eq $event->{path};
   return 0;
 }
 
 sub _fill_event {
   my ($self, $event) = @_;
+
+  my $project = $self->project;
+  $project ||= App::tt::file->new->basename if -d '.git';
+  $project ||= $self->config('project');
+
   $event->{__CLASS__}   ||= 'App::TimeTracker::Data::Task';
-  $event->{project}     ||= $self->project || $self->config('project');
+  $event->{project}     ||= $project;
   $event->{seconds}     ||= 0;
   $event->{user}        ||= scalar(getpwuid $<);
   $event->{tags}        ||= [$self->_tags];
   $event->{description} ||= $self->description // '';
+
   return $event;
 }
 
@@ -366,10 +373,9 @@ sub _print {
     } @$data;
   }
 
-  my $fh = \*STDOUT;
-  if ($data =~ s/^(>|!)\s//) {
-    my $type = $1;
-    $fh   = \*STDERR;
+  my $fh = $self->{stdout} ||= \*STDOUT;
+  if ($data =~ s/^(\d*)(>|!)\s//) {
+    $fh   = $self->{stderr} ||= \*STDERR if $1 eq '2' || $2 eq '!';
     $data = "\n$data\n";
     $data =~ s!\n!\n  !g if $PTY;
   }
@@ -392,11 +398,11 @@ sub _get_previous_event {
   my $self = shift;
 
   # $ROOT/previous contains path to last .trc file
-  my $previous = $self->root->child('previous');
+  my $previous = $self->home->child('previous');
   my $trc_file = -r $previous && App::tt::file->new($previous->slurp);
   return $self->_load($trc_file) if $trc_file && -r $trc_file;
 
-  $self->root->child($NOW->year)->list_tree(sub { $_[0]->parse && ($trc_file = $_[0]) });
+  $self->home->child($NOW->year)->list_tree(sub { $_[0]->parse && ($trc_file = $_[0]) });
   return $self->_load($trc_file) if $trc_file && -r $trc_file;
 
   return {path => $trc_file};
@@ -469,11 +475,11 @@ sub _log {
 
   if ($res->{interval} =~ m!^y!) {
     $res->{when} = $self->_time(Y => $NOW->year + $res->{start_at}, m => 1, d => 1);
-    $res->{path} = $self->root->child($res->{when}->year);
+    $res->{path} = $self->home->child($res->{when}->year);
   }
   else {
     $res->{when} = $self->_time(m => $NOW->mon + $res->{start_at}, d => 1);
-    $res->{path} = $self->root->child($res->{when}->year, sprintf '%02s', $res->{when}->mon);
+    $res->{path} = $self->home->child($res->{when}->year, sprintf '%02s', $res->{when}->mon);
   }
 
   $res->{path}->list_tree(sub {
@@ -506,7 +512,7 @@ sub _mass_edit {
   my $self = shift;
 
   $self->year($NOW->year) if $self->month and !$self->year;
-  my $path = $self->root;
+  my $path = $self->home;
   $path = $path->child($self->year)                  if $self->year;
   $path = $path->child(sprintf '%02s', $self->month) if $self->month;
 
@@ -583,15 +589,18 @@ sub _stop_previous {
   my $duration = $event->{stop} - $event->{start};
   if ($duration->seconds < $self->config('min_time')) {
     $self->_print(
-      qq(! Dropping log event for %s since worked less than @{[$self->config('min_time')]}s.),
+      qq(! Dropping "%s" since the event is shorter than @{[$self->config('min_time')]}s.),
       $event->{project});
     unlink $event->{path} or die "rm $event->{path}: $!";
     return 52;
   }
 
   if ($self->_save($event)) {
-    $self->_print('> Stopped working on %s after %s.',
-      $event->{project}, $self->_duration($duration, 'hms'));
+    $self->_print(
+      '1> Stopped "%s" at %s after %s.',
+      @$event{qw(project stop)},
+      $self->_duration($duration, 'hms')
+    );
     return 0;
   }
 
@@ -605,6 +614,8 @@ sub _time {
   if ($t{str}) {
     my ($ymd, $hms) = split /[T\s]/, $t{str};
     ($hms, $ymd) = ($ymd, '') if !$hms and $ymd =~ m!:!;
+    die qq(Invalid date: "$t{str}"\n) if $ymd and $ymd !~ m!^[\d-]+$!;
+    die qq(Invalid time: "$t{str}"\n) if $hms and $hms !~ m!^[\d:]+$!;
     $t{Y} = $1 if $ymd =~ s!(\d{4})!!;
     $t{m} = $1 if $ymd =~ s!0?(\d{1,2})-(\d+)!$2!;
     $t{d} = $1 if $ymd =~ s!0?(\d{1,2})!!;
@@ -660,13 +671,11 @@ sub _time_left {
 
 sub _trc_path {
   my ($self, $project, $t) = @_;
-  my $month = sprintf '%02s', $t->mon;
-  my $file;
-
   $project =~ s!\W!_!g;
-  $file = sprintf '%s-%s_%s.trc', $t->ymd(''), $t->hms(''), $project;
 
-  return $self->root->child($t->year, $month, $file);
+  my $file  = sprintf '%s-%s_%s.trc', $t->ymd(''), $t->hms(''), $project;
+  my $month = sprintf '%02s', $t->mon;
+  return $self->home->child($t->year, $month, $file);
 }
 
 app {
