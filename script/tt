@@ -14,7 +14,7 @@ use File::Basename ();
 use File::Find qw(find);
 use File::Path ();
 use File::Spec::Functions qw(canonpath catfile splitdir);
-use JSON::XS ();
+use JSON::PP ();
 use overload '@{}' => sub { [splitdir ${$_[0]}] }, '""' => sub { ${$_[0]} }, fallback => 1;
 
 sub new {
@@ -59,7 +59,6 @@ sub spurt {
 package main;
 use Applify;
 use File::Temp ();
-use File::HomeDir;
 use List::Util qw(uniq);
 use Scalar::Util qw(blessed);
 use Time::Piece;
@@ -86,9 +85,7 @@ $SIG{__DIE__} = sub { Carp::confess($_[0]) }
 # Attributes
 sub root {
   shift->{root}
-    //= App::tt::file->new($ENV{TT_HOME}
-      || $ENV{TIMETRACKER_HOME}
-      || (File::HomeDir->my_home, '.TimeTracker'));
+    //= App::tt::file->new($ENV{TT_HOME} || $ENV{TIMETRACKER_HOME} || ($ENV{HOME}, '.TimeTracker'));
 }
 
 sub command_edit {
@@ -442,7 +439,7 @@ sub _duration {
 
 sub _load {
   my ($self, $path) = @_;
-  my $event = JSON::XS::decode_json($path->slurp);
+  my $event = JSON::PP::decode_json($path->slurp);
   $event->{path} = $path;
   $event->{tags} = [map { split /\s*,\s*/, $_ } @{$event->{tags} || []}];
   $event->{$_}   = $self->_time($event->{$_}) for grep { $event->{$_} } qw(start stop);
@@ -568,7 +565,7 @@ sub _save {
 
   $event->{path} = $self->_trc_path($event->{project}, $event->{start});
   $event->{path}->dirname->make_path unless -d $event->{path}->dirname;
-  $event->{path}->spurt(JSON::XS::encode_json(\%event));
+  $event->{path}->spurt(JSON::PP::encode_json(\%event));
   return 1;
 }
 
