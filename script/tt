@@ -192,7 +192,7 @@ sub command_log {
   }
 
   $self->_print(
-    "> Total for %s events since %CB%s%CX: %CM%10s%CX$time_left",
+    "> Total for %s events since %CU%s%CX: %CM%10s%CX$time_left",
     $res->{events},
     join(' ', $res->{when}->month, $res->{when}->year),
     $self->_hms_duration($res->{seconds}, 'hms'), @time_left,
@@ -244,7 +244,7 @@ sub command_start {
   $self->_stop_previous(@args);
   return $! unless $self->_save($event);
   $self->root->child('previous')->spurt($event->{path});
-  $self->_print('> %CGStarted working on project %s at %C_%s%CX%CG.%CX',
+  $self->_print('> %CGStarted working on project %s at %CU%s%CX%CG.%CX',
     $event->{project}, $event->{start}->hms(':'));
   return 0;
 }
@@ -266,13 +266,13 @@ sub command_status {
     return 3;    # No such process
   }
   elsif ($event->{stop}) {
-    $self->_print('> %CGStopped working on %s at %C_%s%CX%CR after %C_%s.%CX',
+    $self->_print('> %CGStopped working on %s at %CU%s%CX%CR after %CU%s.%CX',
       $event->{project}, $event->{stop}, $self->_hms_duration($event->{seconds}));
     return 0;
   }
   else {
     my $duration = $NOW - $event->{start} + $NOW->tzoffset;
-    $self->_print('> %CGBeen working on %s for %C_%s%CX%CG.%CX',
+    $self->_print('> %CGBeen working on %s for %CU%s%CX%CG.%CX',
       $event->{project}, $self->_hms_duration($duration, 'hms'));
     return 0;
   }
@@ -294,6 +294,10 @@ sub config {
     }
 
     $self->{defaults} ||= {
+      color_green     => 'green',
+      color_magenta   => 'magenta',
+      color_red       => 'red',
+      color_underline => 'underline',
       editor          => $ENV{EDITOR}             || 'nano',
       export_columns  => $ENV{TT_COLUMNS}         || 'date,project,hours,rounded,tags,description',
       hours_per_month => $ENV{TT_HOURS_PER_MONTH} || 0,
@@ -356,7 +360,7 @@ sub _print {
     my @fm     = (map({"\%-${_}s"} @spec[0 .. $#spec - 1]), '%s');
     $format = join '', map { sprintf join('  ', @margin, @fm[0 .. $#$_]) . "\n", @$_ } @$format;
     $format
-      = "\n" . sprintf(join('  ', @margin, map {"%%CM%%C_$_%%CX"} @fm), @$header) . "\n$format";
+      = "\n" . sprintf(join('  ', @margin, map {"%%CM%%CU$_%%CX"} @fm), @$header) . "\n$format";
   }
 
   my $fh = \*STDOUT;
@@ -371,12 +375,11 @@ sub _print {
     }
   }
 
-  $format =~ s!\%CB!{$PTY ? color('bold') : ''}!ge;
-  $format =~ s!\%CG!{$PTY ? color('green') : ''}!ge;
-  $format =~ s!\%CM!{$PTY ? color('magenta') : ''}!ge;
-  $format =~ s!\%CR!{$PTY ? color('red') : ''}!ge;
+  $format =~ s!\%CG!{$PTY ? color($self->config('color_green')) : ''}!ge;
+  $format =~ s!\%CM!{$PTY ? color($self->config('color_magenta')) : ''}!ge;
+  $format =~ s!\%CR!{$PTY ? color($self->config('color_red')) : ''}!ge;
   $format =~ s!\%CX!{$PTY ? color('reset') : ''}!ge;
-  $format =~ s!\%C_!{$PTY ? color('underline') : ''}!ge;
+  $format =~ s!\%CU!{$PTY ? color($self->config('color_underline')) : ''}!ge;
 
   return print {$fh} "$format\n" if @_ == 3;
   return printf {$fh} "$format\n", @args;
