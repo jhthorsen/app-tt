@@ -1,7 +1,9 @@
-use lib '.';
-use t::Helper;
+use strict;
+use warnings;
+use File::Spec::Functions qw(rel2abs);
+use Test::More;
 
-my $tt = t::Helper->tt;
+plan skip_all => "Cannot load tt: $! ($@)" unless my $tt = do(rel2abs 'script/tt');
 ok $tt->can("command_$_"), "tt $_" for qw(export log start stop status register);
 
 eval { $tt->_time('13T29') };
