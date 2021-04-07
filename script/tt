@@ -37,6 +37,9 @@ sub list_tree {
   return map { my $f = $self->new(canonpath $_); $cb ? $cb->($f) : $f } sort keys %all;
 }
 
+# ($date, $hms, $project)
+sub parse { $_[0]->basename =~ m!^(\d+)-(\d+)_(.*)\.trc$! ? ($_[-2], $_[-1], $1, $2, $3) : () }
+
 sub slurp {
   my $self = shift;
   die qq{Can't open file "$self": $!} unless open my $file, '<', $$self;
@@ -386,11 +389,17 @@ sub _fill_log_days {
 }
 
 sub _get_previous_event {
-  my $self     = shift;
+  my $self = shift;
+
+  # $ROOT/previous contains path to last .trc file
   my $previous = $self->root->child('previous');
-  my $trc_file = -r $previous
-    && App::tt::file->new($previous->slurp);    # $ROOT/previous contains path to last .trc file
-  return $trc_file && -r $trc_file ? $self->_load($trc_file) : {path => $trc_file};
+  my $trc_file = -r $previous && App::tt::file->new($previous->slurp);
+  return $self->_load($trc_file) if $trc_file && -r $trc_file;
+
+  $self->root->child($NOW->year)->list_tree(sub { $_[0]->parse && ($trc_file = $_[0]) });
+  return $self->_load($trc_file) if $trc_file && -r $trc_file;
+
+  return {path => $trc_file};
 }
 
 sub _group_by_day {
@@ -468,9 +477,8 @@ sub _log {
   }
 
   $res->{path}->list_tree(sub {
-    my $file = shift;
-    return unless my ($date, $hms, $project) = $file->basename =~ m!^(\d+)-(\d+)_(.*)\.trc$!;
-    my $event = $self->_load($file);
+    return unless my ($date, $hms, $project) = $_[0]->parse;
+    my $event = $self->_load($_[0]);
     return if @project_re and !grep { $event->{project} =~ $_ } @project_re;
     return if $tags       and !grep { $tags             =~ /\b$_\b/ } @{$event->{tags}};
     $event->{stop}    ||= $NOW + $NOW->tzoffset;
