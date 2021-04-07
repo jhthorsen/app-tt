@@ -1,6 +1,6 @@
 Revision history for perl distribution App-tt
 
-0.15 Not Released
+0.15 2021-04-07T22:26:31+0900
  - Nicer formatting
  - Fix uninitialized duration
  - Can use default project with "register"
