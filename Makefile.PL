@@ -11,13 +11,8 @@ my %WriteMakefileArgs = (
   OBJECT         => '',
   BUILD_REQUIRES => {},
   TEST_REQUIRES  => {'Test::More' => '0.88'},
-  PREREQ_PM      => {
-    'Applify'       => '0.21',
-    'File::HomeDir' => '1.00',
-    'JSON::XS'      => '3.00',
-    'List::Util'    => '1.45',
-    'perl'          => '5.010001'
-  },
+  PREREQ_PM      =>
+    {'Applify' => '0.21', 'JSON::PP' => '2.20', 'List::Util' => '1.45', 'perl' => '5.010001'},
   META_MERGE => {
     'dynamic_config' => 0,
     'meta-spec'      => {version => 2},
