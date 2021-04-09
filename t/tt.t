@@ -12,8 +12,6 @@ $ENV{TT_PTY}             = 1;
 plan skip_all => "Cannot load tt: $! ($@)" unless my $tt = do(rel2abs 'script/tt');
 plan skip_all => "home is not a tempdir" if int $tt->home->list_tree;
 
-use Mojo::Util;
-
 note 'zero events';
 test_output(
   'command_log', [],
