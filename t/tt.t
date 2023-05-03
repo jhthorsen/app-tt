@@ -69,7 +69,7 @@ test_output(
   'command_export',
   [],
   qr{"project","date","hours","rounded","tags","description"},
-  qr/"foo","\d{4}-\d{2}-\d{2}","0\.5","1","a,b,c",""/,
+  qr/"foo, oss-tt","\d{4}-\d{2}-\d{2}","1\.6","2","a,b,c",""/,
   \qr{Exact hours:  1:34\. Rounded hours: 2\. Events: 2\.},
 );
 

@@ -92,6 +92,7 @@ sub command_edit ($self, $file = '', @) {
 }
 
 sub command_export ($self, @args) {
+  local $self->{g} = 'day' unless $self->group_by;
   my $res    = $self->_log(@args);
   my @cols   = split /,/, $self->config('export_columns');
   my $format = join ',', map {'"%s"'} @cols;
@@ -411,9 +412,9 @@ sub _group_by_day ($self, $res) {
 
   $res->{log} = [
     map {
-      my $p = join ', ', keys %{$_->{_project}};
+      my $p = join ', ', sort keys %{$_->{_project}};
       $pl = length $p if $pl < length $p;
-      +{%$_, project => $p, tags => [keys %{$_->{_tags}}]};
+      +{%$_, project => $p, tags => [sort keys %{$_->{_tags}}]};
     } map { $log{$_} } sort keys %log
   ];
 }

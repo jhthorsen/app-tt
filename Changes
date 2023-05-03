@@ -2,6 +2,7 @@ Revision history for perl distribution App-tt
 
 0.19 Not Released
  - Changed to Getopt::App
+ - Changed to group by day for "export" by default
 
 0.18 2021-04-27T11:09:06+0900
  - Fix "tt edit file.trc"
