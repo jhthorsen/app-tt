@@ -1,13 +1,15 @@
 use strict;
 use warnings;
 use File::Spec::Functions qw(rel2abs);
-use File::Temp qw(tempdir);
+use File::Temp            qw(tempdir);
 use Test::More;
 
 $ENV{TT_HOME} = tempdir;
 $ENV{EDITOR}  = 't/bin/editor.pl';
 
-plan skip_all => "Cannot load tt: $! ($@)" unless my $tt = do(rel2abs 'script/tt');
+plan skip_all => "Cannot load tt: $! ($@)" unless do(rel2abs 'script/tt');
+
+my $tt = App::tt->new;
 plan skip_all => "home is not a tempdir" if int $tt->home->list_tree;
 plan skip_all => "EDITOR is not available" unless -x $ENV{EDITOR};
 

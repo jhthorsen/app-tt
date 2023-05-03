@@ -9,27 +9,27 @@ BEGIN {
 package App::tt::file;
 use strict;
 use warnings;
-use Cwd            ();
-use File::Basename ();
-use File::Find qw(find);
-use File::Path ();
+use experimental          qw(signatures);
+use Cwd                   ();
+use File::Basename        ();
+use File::Find            qw(find);
+use File::Path            ();
 use File::Spec::Functions qw(canonpath catfile splitdir);
-use JSON::PP ();
+use JSON::PP              ();
+
 use overload '@{}' => sub { [splitdir ${$_[0]}] }, '""' => sub { ${$_[0]} }, fallback => 1;
 
-sub new {
-  my $class = shift;
-  my $value = @_ == 1 ? $_[0] : @_ > 1 ? catfile @_ : canonpath(Cwd::getcwd());
+sub new ($class, @args) {
+  my $value = @args == 1 ? $args[0] : @args > 1 ? catfile @args : canonpath(Cwd::getcwd());
   return bless \$value, ref $class || $class;
 }
 
-sub basename  { File::Basename::basename ${shift()}, @_ }
-sub child     { $_[0]->new(${shift()}, @_) }
-sub dirname   { $_[0]->new(scalar File::Basename::dirname ${$_[0]}) }
-sub make_path { File::Path::make_path(${$_[0]}, @_); shift }
+sub basename  ($self, @args) { File::Basename::basename $$self, @args }
+sub child     ($self, @args) { $self->new($$self, @args) }
+sub dirname   ($self, @args) { $self->new(scalar File::Basename::dirname $$self) }
+sub make_path ($self, @args) { File::Path::make_path($$self, @args); $self }
 
-sub list_tree {
-  my ($self, $cb) = (shift, shift);
+sub list_tree ($self, $cb = undef) {
   my %all;
   my $wanted = sub { $all{$File::Find::name}++ unless -d $File::Find::name };
   find {wanted => $wanted, no_chdir => 1}, $$self if -d $$self;
@@ -40,8 +40,7 @@ sub list_tree {
 # ($date, $hms, $project)
 sub parse { $_[0]->basename =~ m!^(\d+)-(\d+)_(.*)\.trc$! ? ($_[-2], $_[-1], $1, $2, $3) : () }
 
-sub slurp {
-  my $self = shift;
+sub slurp ($self) {
   die qq{Can't open file "$self": $!} unless open my $file, '<', $$self;
   my $content = '';
   while ($file->sysread(my $buffer, 131072, 0)) { $content .= $buffer }
@@ -49,32 +48,21 @@ sub slurp {
   return $content;
 }
 
-sub spurt {
-  my ($self, $content) = @_;
+sub spurt ($self, $content) {
   die qq{Can't open file "$self": $!} unless open my $file, '>', $$self;
   die qq{Can't write to file "$self": $!} unless defined $file->syswrite($content);
   return $self;
 }
 
-package main;
-use Applify;
-use File::Temp ();
-use List::Util qw(first uniq);
+package App::tt;
+use Getopt::App -plain, -signatures;
+use File::Temp   ();
+use List::Util   qw(first uniq);
 use Scalar::Util qw(blessed);
 use Time::Piece;
 use Time::Seconds;
 
 use constant DEBUG => $ENV{APP_TT_DEBUG} || 0;
-
-option str => project     => 'Project name. Normally autodetected', alias => 'p';
-option str => tag         => 'Tags for an event',                alias => 't', n_of => '@';
-option str => description => 'Description for an event',         alias => 'd';
-option str => group_by    => 'Group log output: --group-by day', alias => 'g';
-option str => month       => 'Mass edit a month';
-option str => year        => 'Mass edit a year';
-
-documentation 'App::tt';
-version 'App::tt';
 
 our $PTY = $ENV{TT_PTY} || -t STDOUT;
 our $NOW = localtime;
@@ -83,23 +71,28 @@ $SIG{__DIE__} = sub { Carp::confess($_[0]) }
   if DEBUG;
 
 # Attributes
-sub home {
-  shift->{home}
+sub home ($self) {
+  $self->{home}
     //= App::tt::file->new($ENV{TT_HOME} || $ENV{TIMETRACKER_HOME} || ($ENV{HOME}, '.TimeTracker'));
 }
 
+sub description ($self, @v) { !@v ? $self->{d}     : (($self->{d}     = $v[0]), $self)[1] }
+sub group_by    ($self, @v) { !@v ? $self->{g}     : (($self->{g}     = $v[0]), $self)[1] }
+sub month       ($self, @v) { !@v ? $self->{month} : (($self->{month} = $v[0]), $self)[1] }
+sub project     ($self, @v) { !@v ? $self->{p}     : (($self->{p}     = $v[0]), $self)[1] }
+sub tag         ($self, @v) { !@v ? $self->{t}     : (($self->{t}     = $v[0]), $self)[1] }
+sub year        ($self, @v) { !@v ? $self->{year}  : (($self->{year}  = $v[0]), $self)[1] }
+
 # Commands
-sub command_edit {
-  my $self = shift;
-  return $self->_edit_with_editor(App::tt::file->new($_[0])) if @_ and -f $_[0]; # Edit a given file
-  return $self->_mass_edit(@_) if $self->year or $self->month or !-t STDIN;
+sub command_edit ($self, $file = '', @) {
+  return $self->_edit_with_editor(App::tt::file->new($file))
+    if $file and -f $file;    # Edit a given file
+  return $self->_mass_edit if $self->year or $self->month or !-t STDIN;
   return $self->_edit_with_editor;
 }
 
-sub command_export {
-  my $self = shift;
-  my $res  = $self->_log(@_);
-
+sub command_export ($self, @args) {
+  my $res    = $self->_log(@args);
   my @cols   = split /,/, $self->config('export_columns');
   my $format = join ',', map {'"%s"'} @cols;
 
@@ -137,10 +130,8 @@ sub command_export {
   return 0;
 }
 
-sub command_help {
-  my $self = shift;
-  my $for  = shift || 'app';
-  return $self->_script->print_help, 0 if $for eq 'app';
+sub command_help ($self, $for = 'app', @) {
+  return print extract_usage if $for eq 'app';
 
   my ($today, @help) = ($NOW->ymd);
   require App::tt;
@@ -157,10 +148,8 @@ sub command_help {
   return 0;
 }
 
-sub command_log {
-  my $self = shift;
-  my $res  = $self->_log(@_);
-
+sub command_log ($self, @args) {
+  my $res   = $self->_log(@args);
   my @table = (['Month', 'Date', 'Start', 'Duration', 'Project', 'Tags'], '-');
   for my $event (sort { $a->{start} <=> $b->{start} } @{$res->{log}}) {
     my $start = $event->{start};
@@ -193,13 +182,10 @@ sub command_log {
       ['Remaining time', ':', $self->_duration($sec / ($days <= 0 ? 1 : $days), '-hm') . '/day'];
   }
 
-  $self->_print(\@table);
-
-  return 0;
+  return $self->_print(\@table) && 0;
 }
 
-sub command_register {
-  my ($self, $start, $stop) = @_;
+sub command_register ($self, $start = '', $stop = '', @) {
   return $self->command_help('register') unless $start and $stop;
 
   $start = $self->_time(str => $start);
@@ -217,8 +203,7 @@ sub command_register {
   return $!;
 }
 
-sub command_start {
-  my ($self, @args) = @_;
+sub command_start ($self, @args) {
   my $event
     = $self->_fill_event({
     project => (first {/^[A-Za-z0-9-]+$/} @args), start => $self->_time(first {/\d+\:/} @args),
@@ -233,29 +218,23 @@ sub command_start {
   return 0;
 }
 
-sub command_stop {
-  my $self      = shift;
-  my $exit_code = $self->_stop_previous(@_);
+sub command_stop ($self, @args) {
+  my $exit_code = $self->_stop_previous(@args);
   $self->_print('! No event to stop.') if $exit_code == 3;
   return $exit_code;
 }
 
-sub command_status {
-  my $self  = shift;
+sub command_status ($self, @) {
   my $event = $self->_get_previous_event;
   warn "[APP_TT] status $event->{path}\n" if DEBUG;
+  return $self->_print('1> No event is being tracked.') && 3 unless $event->{start};
 
-  if (!$event->{start}) {
-    $self->_print('1> No event is being tracked.');
-    return 3;    # No such process
-  }
-  elsif ($event->{stop}) {
+  if ($event->{stop}) {
     $self->_print(
       '1> Stopped "%s" at %s after %s.',
       @$event{qw(project stop)},
       $self->_duration($event->{seconds}, 'hms')
     );
-    return 0;
   }
   else {
     my $duration = $NOW - $event->{start} + $NOW->tzoffset;
@@ -263,13 +242,12 @@ sub command_status {
       '1> Tracking "%s" for %s since %s.', $event->{project},
       $self->_duration($duration, 'hms'),  $event->{start}->hms(':')
     );
-    return 0;
   }
+
+  return 0;
 }
 
-sub config {
-  my ($self, $key) = @_;
-
+sub config ($self, $key) {
   unless ($self->{config}) {
     local %ENV = %ENV;
     for my $path ($self->home->child('config'), '.env') {
@@ -294,8 +272,27 @@ sub config {
   return $self->{config}{$key} // $self->{defaults}{$key} // die "Missing option '$key'.\n";
 }
 
-sub _edit_with_editor {
-  my ($self, $trc_file) = @_;
+sub getopt_post_process_argv { }
+
+sub getopt_subcommands ($self) {
+  my $subapp = sub ($name) {
+    my $cb = $self->can($name);
+    return sub ($argv) { $self->$cb(@$argv) };
+  };
+
+  return [
+    ['status',   'command_status',   'Show current status'],
+    ['start',    'command_start',    'Start tracking a new event'],
+    ['stop',     'command_stop',     'Stop tracking the current event'],
+    ['register', 'command_register', 'Register events with start and stop time'],
+    ['log',      'command_log',      'Show log in a human friendly format'],
+    ['export',   'command_export',   'Export the log as CSV to STDOUT'],
+    ['edit',     'command_edit',     'Edit last entry or a specific file'],
+    ['help',     'command_help',     'Print help text'],
+  ];
+}
+
+sub _edit_with_editor ($self, $trc_file = '') {
   my $prev  = $trc_file ? 0                          : 1;
   my $event = $prev     ? $self->_get_previous_event : $self->_load($trc_file);
 
@@ -328,9 +325,7 @@ sub _edit_with_editor {
   return 0;
 }
 
-sub _fill_event {
-  my ($self, $event) = @_;
-
+sub _fill_event ($self, $event) {
   my $project = $self->project;
   $project ||= App::tt::file->new->basename if -d '.git';
   $project ||= $self->config('project');
@@ -345,9 +340,7 @@ sub _fill_event {
   return $event;
 }
 
-sub _print {
-  my ($self, $data, @args) = @_;
-
+sub _print ($self, $data, @args) {
   if (ref $data eq 'ARRAY') {
     my $th     = $data->[0][-1] eq '{X}' ? 1    : 0;
     my @margin = $PTY                    ? ('') : ();
@@ -381,22 +374,20 @@ sub _print {
     $data =~ s!\n!\n  !g if $PTY;
   }
 
-  return print {$fh} "$data\n" if @_ == 2;
-  return printf {$fh} "$data\n", @args;
+  return printf {$fh} "$data\n", @args if @args;
+  return print {$fh} "$data\n";
 }
 
-sub _fill_log_days {
-  my ($self, $last, $now) = @_;
+sub _fill_log_days ($self, $last, $now) {
   my $interval = int(($now - $last)->days);
 
-  map {
+  return map {
     my $t = $last + $_ * 86400;
     +{seconds => 0, start => $t, tags => [$t->day]}
   } 1 .. $interval;
 }
 
-sub _get_previous_event {
-  my $self = shift;
+sub _get_previous_event ($self) {
 
   # $ROOT/previous contains path to last .trc file
   my $previous = $self->home->child('previous');
@@ -405,15 +396,11 @@ sub _get_previous_event {
 
   $self->home->child($NOW->year)->list_tree(sub { $_[0]->parse && ($trc_file = $_[0]) });
   return $self->_load($trc_file) if $trc_file && -r $trc_file;
-
   return {path => $trc_file};
 }
 
-sub _group_by_day {
-  my ($self, $res) = @_;
-  my $pl = 0;
-  my %log;
-
+sub _group_by_day ($self, $res) {
+  my ($pl, %log) = (0);
   for my $e (@{$res->{log}}) {
     my $k = $e->{start}->ymd;
     $log{$k} ||= {%$e, seconds => 0};
@@ -431,8 +418,7 @@ sub _group_by_day {
   ];
 }
 
-sub _duration {
-  my ($self, $duration, $sep) = @_;
+sub _duration ($self, $duration, $sep = '') {
   my $seconds = int(ref $duration ? $duration->seconds : $duration);
   my ($hours, $minutes);
 
@@ -447,8 +433,7 @@ sub _duration {
   return sprintf '%sh %sm %ss',  $hours, $minutes, $seconds;
 }
 
-sub _load {
-  my ($self, $path) = @_;
+sub _load ($self, $path) {
   my $event = JSON::PP::decode_json($path->slurp);
   $event->{path} = $path;
   $event->{tags} = [map { split /\s*,\s*/, $_ } @{$event->{tags} || []}];
@@ -456,14 +441,12 @@ sub _load {
   return $event;
 }
 
-sub _log {
-  my $self       = shift;
+sub _log ($self, @args) {
   my $tags       = join ',', $self->_tags;
   my @project_re = map {qr{^$_\b}} split /,/, $self->project || '.+';
+  my $res        = {events => 0, log => [], seconds => 0};
 
-  my $res = {events => 0, log => [], seconds => 0};
-
-  for (@_) {
+  for (@args) {
     /^(-\d+)(m|y|month|year)$/ and ($res->{start_at} = $1 and $res->{interval} = $2);
     /^(-\d+)$/      and $res->{start_at} ||= $1;
     /^(month|year)/ and $res->{interval} ||= $1;
@@ -509,9 +492,7 @@ sub _log {
   return $res;
 }
 
-sub _mass_edit {
-  my $self = shift;
-
+sub _mass_edit ($self) {
   $self->year($NOW->year) if $self->month and !$self->year;
   my $path = $self->home;
   $path = $path->child($self->year)                  if $self->year;
@@ -533,22 +514,23 @@ sub _mass_edit {
       or die "Could not compile code from STDIN: $@\n";
   }
 
-  $path->list_tree(sub {
-    my %info = (file => shift);
-    return unless $info{file} =~ m!$re$!;
-    @info{qw(year month day date hms project)} = ($1, $2, $3, "$1$2$3", $4, $5);
-    $self->command_edit($info{file}), next unless $code;
-    my $event = $self->_load($info{file});
-    local %_ = %info;
-    $self->_save($event) if $code and $self->$code($event);
-    unlink $info{file} or die "rm $info{file}: $!" unless $info{file} eq $event->{path};
-  });
+  $path->list_tree(
+    sub ($file, @) {
+      my %info = (file => $file);
+      return unless $info{file} =~ m!$re$!;
+      @info{qw(year month day date hms project)} = ($1, $2, $3, "$1$2$3", $4, $5);
+      $self->command_edit($info{file}), next unless $code;
+      my $event = $self->_load($info{file});
+      local %_ = %info;
+      $self->_save($event) if $code and $self->$code($event);
+      unlink $info{file} or die "rm $info{file}: $!" unless $info{file} eq $event->{path};
+    }
+  );
 
   return 0;
 }
 
-sub _save {
-  my ($self, $event) = @_;
+sub _save ($self, $event) {
   $event = $self->_fill_event($event);
 
   if (my $duration = $event->{stop} && $event->{start} && $event->{stop} - $event->{start}) {
@@ -573,15 +555,12 @@ sub _save {
   return 1;
 }
 
-sub _tags {
-  my $self = shift;
-  return $self->tag(shift) if @_;
+sub _tags ($self, @args) {
+  return $self->tag(@args) if @args;
   return uniq map { split /,/, $_ } @{$self->tag || []};
 }
 
-sub _stop_previous {
-  my ($self, @args) = @_;
-
+sub _stop_previous ($self, @args) {
   my $event = $self->_get_previous_event;
   return 3 if !$event->{start} or $event->{stop};    # 3 == No such process
 
@@ -608,9 +587,8 @@ sub _stop_previous {
   return $! || 1;
 }
 
-sub _time {
-  my $self = shift;
-  my %t    = @_ == 1 ? (str => shift) : (@_);
+sub _time ($self, @args) {
+  my %t = @args == 1 ? (str => @args) : (@args);
 
   if ($t{str}) {
     my ($ymd, $hms) = split /[T\s]/, $t{str};
@@ -650,8 +628,7 @@ sub _time {
   return $t{tp};
 }
 
-sub _time_left {
-  my ($self, $res) = @_;
+sub _time_left ($self, $res) {
   my $start       = $self->_time(d => 1, H => 0, M => 0, S => 0);
   my $end         = $self->_time(d => 1, m => $start->mon + 1, H => 0, M => 0, S => 0);
   my $total_days  = 0;
@@ -670,20 +647,54 @@ sub _time_left {
   return $remaining_days, $remaining_seconds;
 }
 
-sub _trc_path {
-  my ($self, $project, $t) = @_;
+sub _trc_path ($self, $project, $t) {
   $project =~ s!\W!_!g;
-
   my $file  = sprintf '%s-%s_%s.trc', $t->ymd(''), $t->hms(''), $project;
   my $month = sprintf '%02s', $t->mon;
   return $self->home->child($t->year, $month, $file);
 }
 
-app {
-  my ($self, $command) = (shift, shift);
-  return $self->command_help($ENV{APP_TT_HELP}) if $ENV{APP_TT_HELP};
-  return $self->command_status(@_)              if !$command or $command eq 'status';
-  my $method = $self->can("command_$command");
-  return $self->$method(@_) if $method;
-  die qq(Unknown command "$command".\n);
-};
+run(
+  'p|project=s     # Project name. Normally autodetected',
+  't|tag=s@        # Tags for an event',
+  'd|description=s # Description for an event',
+  'g|group-by=s    # Group log output: --group-by day',
+  'month           # Mass edit a month',
+  'year            # Mass edit a year',
+  'h|help          # Show help text',
+  sub ($self, @argv) {
+    return print extract_usage if $self->{h};
+    return @argv ? $self->command_help($ENV{APP_TT_HELP} || 'app') : $self->command_status;
+  }
+);
+
+__END__
+
+=head1 SYNOPSIS
+
+  # Start tracking time
+  $ tt start
+  $ tt start [-p project-name] [-t tag1,tag2] [09:03]
+
+  # Get status
+  $ tt [status]
+
+  # Stop tracking time. Specifiying a time will go back to yesterday,
+  # in case you forgot to stop it.
+  $ tt stop [18:04]
+
+  # See the log
+  $ tt log
+  $ tt log -0year                  # Log for this year
+  $ tt log -1year -t meetings      # Log for last year, for tag "meetings"
+  $ tt log -p project-name -1month # Log for last month, for project "project-name"
+  $ tt log -2                      # Log for two months back
+  $ tt export -1                   # Export as CSV
+
+  # Edit the last entry, or a specific file
+  $ tt edit [~/.TimeTracker/2020/01/20200106-150000_nms.trc]
+
+  # Register forgotten time
+  $ tt register 2020-01-01T09:00:00 17:00:00 -p "project-name" [-d "description"] [-t "tag1,tag2"]
+
+=cut

@@ -3,7 +3,9 @@ use warnings;
 use File::Spec::Functions qw(rel2abs);
 use Test::More;
 
-plan skip_all => "Cannot load tt: $! ($@)" unless my $tt = do(rel2abs 'script/tt');
+plan skip_all => "Cannot load tt: $! ($@)" unless do(rel2abs 'script/tt');
+
+my $tt = App::tt->new;
 ok $tt->can("command_$_"), "tt $_" for qw(export log start stop status register);
 
 eval { $tt->_time('13T29') };
@@ -20,15 +22,15 @@ my $home = $tt->home;
 {
   local $ENV{TT_HOME} = '/tmp/tt';
   delete $tt->{home};
-  is $tt->home, '/tmp/tt', 'TIMETRACKER_HOME';
-  isnt $tt->home, $home, 'not default home';
+  is $tt->home,   '/tmp/tt', 'TIMETRACKER_HOME';
+  isnt $tt->home, $home,     'not default home';
 }
 
 {
   local $ENV{TIMETRACKER_HOME} = '/tmp/tt';
   delete $tt->{home};
-  is $tt->home, '/tmp/tt', 'TIMETRACKER_HOME';
-  isnt $tt->home, $home, 'not default home';
+  is $tt->home,   '/tmp/tt', 'TIMETRACKER_HOME';
+  isnt $tt->home, $home,     'not default home';
 }
 
 done_testing;

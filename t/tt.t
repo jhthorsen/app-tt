@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 use File::Spec::Functions qw(rel2abs);
-use File::Temp qw(tempdir);
+use File::Temp            qw(tempdir);
 use Test::More;
 
 $ENV{TT_COLUMNS}         = 'project,date,hours,rounded,tags,description';  # not the same as default
@@ -9,7 +9,9 @@ $ENV{TT_HOME}            = tempdir;
 $ENV{TT_HOURS_PER_MONTH} = 0;
 $ENV{TT_PTY}             = 1;
 
-plan skip_all => "Cannot load tt: $! ($@)" unless my $tt = do(rel2abs 'script/tt');
+plan skip_all => "Cannot load tt: $! ($@)" unless do(rel2abs 'script/tt');
+
+my $tt = App::tt->new;
 plan skip_all => "home is not a tempdir" if int $tt->home->list_tree;
 
 note 'zero events';

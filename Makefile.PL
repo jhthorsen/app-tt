@@ -13,9 +13,10 @@ my %WriteMakefileArgs = (
   ABSTRACT_FROM => 'lib/App/tt.pm',
   VERSION_FROM  => 'lib/App/tt.pm',
   EXE_FILES     => [],
-  TEST_REQUIRES => {'Test::More'   => '0.88'},
-  PREREQ_PM     => {'Applify' => '0.21', 'JSON::PP' => '2.20', 'List::Util' => '1.45', 'perl' => '5.010001'},
-  META_MERGE    => {
+  TEST_REQUIRES => {'Test::More' => '0.88'},
+  PREREQ_PM     =>
+    {'Getopt::App' => '0.13', 'JSON::PP' => '2.20', 'List::Util' => '1.45', 'perl' => '5.020001'},
+  META_MERGE => {
     'dynamic_config' => 0,
     'meta-spec'      => {version   => 2},
     'no_index'       => {directory => [qw(examples t)]},

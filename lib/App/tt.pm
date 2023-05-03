@@ -103,7 +103,7 @@ Can also use the environment aliases:
 
 =head1 ACTIONS
 
-Each command can tak C<-h> for more details. Example:
+Each command can take C<-h> for more details. Example:
 
   $ tt start -h
 
