@@ -463,7 +463,9 @@ sub _log ($self, @args) {
     $res->{path} = $self->home->child($res->{when}->year);
   }
   else {
-    $res->{when} = $self->_time(m => $NOW->mon + $res->{start_at}, d => 1);
+    my ($m, $Y) = ($NOW->mon + $res->{start_at}, $NOW->year);
+    if ($m <= 0) { $m += 12; $Y--; }
+    $res->{when} = $self->_time(Y => $Y, m => $m, d => 1);
     $res->{path} = $self->home->child($res->{when}->year, sprintf '%02s', $res->{when}->mon);
   }
 
