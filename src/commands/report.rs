@@ -1,9 +1,50 @@
 use crate::entries::{TrackedEntry, find_tracked_entries};
-use crate::styling::{plain_table, print_table, regular_table};
-use crate::utils::{DASH, format_date, format_duration, is_same_date, to_naive_date};
+use crate::styling::{DASH, plain_table, print_table, regular_table};
+use crate::utils::{format_date, format_duration, is_same_date, to_naive_date};
 use chrono::Datelike;
 use clap::{Arg, Command};
 use prettytable::{Cell, Row, Table, row};
+
+pub fn command() -> Command {
+    let now = chrono::Local::now();
+    let first_of_month = now.with_day(1).expect("Invalid day");
+
+    Command::new("report")
+        .about("Show time spent")
+        .arg(
+            Arg::new("project")
+                .help("Project name")
+                .short('p')
+                .long("project"),
+        )
+        .arg(
+            Arg::new("tag")
+                .help("Tag(s) to filter by")
+                .short('t')
+                .long("tag"),
+        )
+        .arg(
+            Arg::new("since")
+                .help("From what time")
+                .long("since")
+                .default_value(first_of_month.format("%Y-%m-%d").to_string()),
+        )
+        .arg(
+            Arg::new("until")
+                .help("Until what time")
+                .long("until")
+                .default_value("now"),
+        )
+        .arg(
+            Arg::new("group")
+                .help("Group by day")
+                .num_args(0..=1)
+                .short('g')
+                .long("group")
+                .default_value("none")
+                .default_missing_value("day"),
+        )
+}
 
 pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
     let since = to_naive_date(args.get_one::<String>("since"));
@@ -91,45 +132,4 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
     print_table(summary, plain_table(), [0, 1]);
 
     Ok(0)
-}
-
-pub fn subcommand() -> Command {
-    let now = chrono::Local::now();
-    let first_of_month = now.with_day(1).expect("Invalid day");
-
-    Command::new("report")
-        .about("Show time spent")
-        .arg(
-            Arg::new("project")
-                .help("Project name")
-                .short('p')
-                .long("project"),
-        )
-        .arg(
-            Arg::new("tag")
-                .help("Tag(s) to filter by")
-                .short('t')
-                .long("tag"),
-        )
-        .arg(
-            Arg::new("since")
-                .help("From what time")
-                .long("since")
-                .default_value(first_of_month.format("%Y-%m-%d").to_string()),
-        )
-        .arg(
-            Arg::new("until")
-                .help("Until what time")
-                .long("until")
-                .default_value("now"),
-        )
-        .arg(
-            Arg::new("group")
-                .help("Group by day")
-                .num_args(0..=1)
-                .short('g')
-                .long("group")
-                .default_value("none")
-                .default_missing_value("day"),
-        )
 }

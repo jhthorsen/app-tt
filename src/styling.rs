@@ -1,5 +1,7 @@
 use prettytable::{Table, format};
 
+pub const DASH: &str = "—";
+
 pub fn plain_table() -> format::TableFormat {
     format::FormatBuilder::new()
         .borders(' ')

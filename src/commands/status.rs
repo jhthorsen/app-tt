@@ -1,9 +1,13 @@
 use crate::entries::find_tracked_entries;
-use crate::styling::{plain_table, print_table};
-use crate::utils::{DASH, format_date, format_duration};
+use crate::styling::{DASH, plain_table, print_table};
+use crate::utils::{format_date, format_duration};
 use chrono::{Datelike, Duration};
 use clap::Command;
 use prettytable::{Table, row};
+
+pub fn command() -> Command {
+    Command::new("status").about("Show the current time tracking status")
+}
 
 pub fn run(_args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
     let now = chrono::Local::now().date_naive();
@@ -35,8 +39,4 @@ pub fn run(_args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
     print_table(summary, plain_table(), [1, 1]);
 
     Ok(0)
-}
-
-pub fn subcommand() -> Command {
-    Command::new("status").about("Show the current time tracking status")
 }

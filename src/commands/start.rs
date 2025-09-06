@@ -1,11 +1,14 @@
 use clap::{Arg, Command};
-pub fn run(_args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
-    Ok(0)
-}
 
-pub fn subcommand() -> Command {
-    Command::new("register")
-        .about("Register a missed entry")
+pub fn command() -> clap::Command {
+    Command::new("start")
+        .about("Start tracking time")
+        .arg(
+            Arg::new("start_time")
+                .help("The start time for tracking (e.g., '08:00')")
+                .default_value("now")
+                .index(1),
+        )
         .arg(
             Arg::new("project")
                 .help("Project name")
@@ -26,4 +29,8 @@ pub fn subcommand() -> Command {
                 .short('d')
                 .long("description"),
         )
+}
+
+pub fn run(_args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
+    Ok(0)
 }

@@ -1,7 +1,5 @@
 use chrono::Datelike;
 
-pub const DASH: &str = "—";
-
 pub fn format_date(d: &chrono::NaiveDateTime, format: &'static str) -> String {
     match format {
         "full" => d.format("%Y-%m-%d %H:%M").to_string(),

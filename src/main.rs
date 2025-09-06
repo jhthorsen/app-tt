@@ -1,9 +1,5 @@
 mod entries;
-mod register;
-mod report;
-mod start;
-mod status;
-mod stop;
+mod commands;
 mod styling;
 mod utils;
 
@@ -14,19 +10,19 @@ fn main() {
         .version(env!("CARGO_PKG_VERSION"))
         .about("Time tracking app")
         .author("Jan Henning Thorsen <jan.henning@thorsenlabs.com>")
-        .subcommand(start::subcommand())
-        .subcommand(stop::subcommand())
-        .subcommand(status::subcommand())
-        .subcommand(report::subcommand())
-        .subcommand(register::subcommand())
+        .subcommand(commands::start::command())
+        .subcommand(commands::stop::command())
+        .subcommand(commands::status::command())
+        .subcommand(commands::report::command())
+        .subcommand(commands::register::command())
         .get_matches();
 
     let exit_code = match matches.subcommand() {
-        Some(("start", args)) => start::run(args),
-        Some(("stop", args)) => stop::run(args),
-        Some(("report", args)) => report::run(args),
-        Some(("register", args)) => register::run(args),
-        _ => status::run(&matches),
+        Some(("start", args)) => commands::start::run(args),
+        Some(("stop", args)) => commands::stop::run(args),
+        Some(("report", args)) => commands::report::run(args),
+        Some(("register", args)) => commands::register::run(args),
+        _ => commands::status::run(&matches),
     };
 
     match exit_code {

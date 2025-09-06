@@ -21,7 +21,7 @@ impl TrackedEntry {
             return d;
         }
 
-        crate::utils::DASH
+        crate::styling::DASH
     }
 
     pub fn duration(&self) -> chrono::Duration {
