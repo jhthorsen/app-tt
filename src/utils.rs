@@ -1,6 +1,17 @@
 use chrono::Datelike;
 
-pub fn format_hour_minutes(duration: &chrono::Duration) -> String {
+pub const DASH: &str = "—";
+
+pub fn format_date(d: &chrono::NaiveDateTime, format: &'static str) -> String {
+    match format {
+        "full" => d.format("%Y-%m-%d %H:%M").to_string(),
+        "ymd" => d.format("%Y-%m-%d").to_string(),
+        "hm" => d.format("%H:%M").to_string(),
+        f => todo!("{f} is not supported"),
+    }
+}
+
+pub fn format_duration(duration: &chrono::Duration) -> String {
     let hours = duration.num_hours();
     let minutes = duration.num_minutes() % 60;
     format!("{}h {:02}m", hours, minutes)

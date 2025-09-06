@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 #[derive(Debug, Default, Deserialize)]
 pub struct TrackedEntry {
-    // pub description: Option<String>,
+    pub description: Option<String>,
     pub project: String,
     #[serde(skip_deserializing)]
     pub total_duration: Option<chrono::Duration>,
@@ -14,6 +14,16 @@ pub struct TrackedEntry {
 }
 
 impl TrackedEntry {
+    pub fn description(&self) -> &str {
+        if let Some(d) = &self.description
+            && !d.is_empty()
+        {
+            return d;
+        }
+
+        crate::utils::DASH
+    }
+
     pub fn duration(&self) -> chrono::Duration {
         self.stop
             .unwrap_or_else(|| chrono::Local::now().naive_local())
@@ -40,11 +50,6 @@ impl TrackedEntry {
         }
 
         true
-    }
-
-    pub fn stop(&self) -> chrono::NaiveDateTime {
-        self.stop
-            .unwrap_or_else(|| chrono::Local::now().naive_local())
     }
 
     pub fn tags_as_string(&self) -> String {

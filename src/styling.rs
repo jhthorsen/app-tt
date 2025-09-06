@@ -1,19 +1,26 @@
-use prettytable::format;
+use prettytable::{Table, format};
 
-pub fn summary_styling() -> format::TableFormat {
+pub fn plain_table() -> format::TableFormat {
     format::FormatBuilder::new()
         .borders(' ')
-        .padding(2, 1)
+        .padding(1, 1)
         .build()
 }
 
-pub fn table_styling() -> format::TableFormat {
+pub fn print_table(mut t: Table, format: format::TableFormat, padding: [usize; 2]) {
+    t.set_format(format);
+    (0..padding[0]).for_each(|_| println!());
+    t.printstd();
+    (0..padding[1]).for_each(|_| println!());
+}
+
+pub fn regular_table() -> format::TableFormat {
     format::FormatBuilder::new()
         .borders(' ')
+        .padding(1, 1)
         .separators(
             &[format::LinePosition::Title, format::LinePosition::Bottom],
             format::LineSeparator::new('─', '─', ' ', '─'),
         )
-        .padding(2, 1)
         .build()
 }

@@ -1,5 +1,6 @@
 use crate::entries::{TrackedEntry, find_tracked_entries};
-use crate::utils::{format_hour_minutes, is_same_date, to_naive_date};
+use crate::styling::{plain_table, print_table, regular_table};
+use crate::utils::{DASH, format_date, format_duration, is_same_date, to_naive_date};
 use chrono::Datelike;
 use clap::{Arg, Command};
 use prettytable::{Cell, Row, Table, row};
@@ -15,7 +16,6 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
     };
 
     let mut report = Table::new();
-    report.set_format(crate::styling::table_styling());
     report.set_titles(row!["Date", "Project", "Start", "Stop", "Duration", "Tags"]);
 
     let mut total_entries = 0;
@@ -41,6 +41,7 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
         let (entry, duration) = if arg_group == "day" {
             if grouped_entry.total_duration.is_none() {
                 grouped_entry = TrackedEntry {
+                    description: entry.description.clone(),
                     total_duration: Some(duration),
                     project: entry.project.clone(),
                     start: entry.start,
@@ -62,12 +63,18 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
             (entry, duration)
         };
 
+        let stop = if let Some(d) = entry.stop {
+            format_date(&d, "hm")
+        } else {
+            DASH.to_string()
+        };
+
         report.add_row(Row::new(vec![
-            Cell::new(&entry.start.format("%Y-%m-%d").to_string()),
+            Cell::new(&format_date(&entry.start, "ymd")),
             Cell::new(&entry.project),
-            Cell::new(&entry.start.format("%H:%M").to_string()),
-            Cell::new(&entry.stop().format("%H:%M").to_string()),
-            Cell::new(&format_hour_minutes(&duration)).style_spec("r"),
+            Cell::new(&format_date(&entry.start, "hm")),
+            Cell::new(&stop),
+            Cell::new(&format_duration(&duration)).style_spec("r"),
             Cell::new(&entry.tags_as_string()),
         ]));
 
@@ -76,18 +83,13 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
         }
     }
 
-    println!();
-    report.printstd();
-
     let mut summary = Table::new();
-    summary.set_format(crate::styling::summary_styling());
     summary.add_row(row!["Total entries:", total_entries.to_string()]);
-    summary.add_row(row!["Total time:", &format_hour_minutes(&total_duration)]);
+    summary.add_row(row!["Total time:", &format_duration(&total_duration)]);
 
-    println!();
-    summary.printstd();
+    print_table(report, regular_table(), [1, 1]);
+    print_table(summary, plain_table(), [0, 1]);
 
-    println!();
     Ok(0)
 }
 
