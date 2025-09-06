@@ -1,8 +1,11 @@
+mod entries;
 mod register;
 mod report;
 mod start;
 mod status;
 mod stop;
+mod styling;
+mod utils;
 
 use clap::Command;
 
