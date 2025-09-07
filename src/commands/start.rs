@@ -1,4 +1,4 @@
-use crate::entries::{TrackedEntry, find_last_tracked_entry};
+use crate::event::{TimeEvent, find_last_event};
 use crate::styling::{plain_table, print_table};
 use crate::utils::{min_duration, to_naive_date_time};
 use clap::{Arg, Command};
@@ -14,19 +14,19 @@ pub fn command() -> clap::Command {
         )
         .arg(
             Arg::new("project")
-                .help("Project name")
+                .help("Event project name")
                 .short('p')
                 .long("project"),
         )
         .arg(
             Arg::new("tag")
-                .help("Tag(s) for the time entry")
+                .help("Event tag(s)")
                 .short('t')
                 .long("tag"),
         )
         .arg(
             Arg::new("description")
-                .help("Time entry description")
+                .help("Event description")
                 .short('d')
                 .long("description"),
         )
@@ -53,8 +53,8 @@ fn default_project() -> String {
     "default".to_string()
 }
 
-fn not_too_old_to_resume(entry: &TrackedEntry, max_age: i64) -> bool {
-    if let Some(stop) = entry.stop {
+fn not_too_old_to_resume(event: &TimeEvent, max_age: i64) -> bool {
+    if let Some(stop) = event.stop {
         let now = chrono::Local::now().naive_local();
         let diff = now - stop;
         diff.num_seconds() <= max_age
@@ -65,7 +65,7 @@ fn not_too_old_to_resume(entry: &TrackedEntry, max_age: i64) -> bool {
 
 pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
     let start = to_naive_date_time(args.get_one::<String>("start_time"), None)?;
-    let mut last = find_last_tracked_entry().unwrap_or_default();
+    let mut last = find_last_event().unwrap_or_default();
 
     let tags = if let Some(tag) = args.get_one::<String>("tag") {
         tag.split(',').map(|s| s.trim().to_string()).collect()
@@ -80,7 +80,7 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
         .unwrap_or(&default_project())
         .to_owned();
 
-    let entry = if let Some(max_age) = resume
+    let event = if let Some(max_age) = resume
         && last.project == project
         && last.stop.is_some()
         && not_too_old_to_resume(&last, *max_age)
@@ -94,7 +94,7 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
         status = "Tracking";
         last
     } else {
-        // Stop current entry if not already stopped
+        // Stop current event if not already stopped
         if !last.project.is_empty() && last.stop.is_none() {
             last.stop = Some(start);
             if last.duration().num_seconds() < min_duration()? {
@@ -104,7 +104,7 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
             }
         }
 
-        let new = TrackedEntry {
+        let new = TimeEvent {
             description: args
                 .get_one::<String>("description")
                 .cloned()
@@ -120,7 +120,7 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
     };
 
     if !args.get_flag("quiet") {
-        print_table(entry.to_table(status), plain_table(), [1, 1]);
+        print_table(event.to_table(status), plain_table(), [1, 1]);
     }
 
     Ok(0)

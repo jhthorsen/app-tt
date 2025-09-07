@@ -1,5 +1,5 @@
 mod commands;
-mod entries;
+mod event;
 mod styling;
 mod utils;
 

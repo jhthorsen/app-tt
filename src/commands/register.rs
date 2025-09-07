@@ -1,4 +1,4 @@
-use crate::entries::TrackedEntry;
+use crate::event::TimeEvent;
 use crate::styling::{plain_table, print_table};
 use crate::utils::to_naive_date_time;
 use clap::{Arg, Command};
@@ -7,7 +7,7 @@ pub fn command() -> Command {
     let example_time = chrono::Local::now().naive_local().format("%Y-%m-%dT%H:%M");
 
     Command::new("register")
-        .about("Register a missed entry")
+        .about("Register an event with start and stop time")
         .arg(
             Arg::new("start_time")
                 .help(format!(
@@ -28,20 +28,20 @@ pub fn command() -> Command {
         )
         .arg(
             Arg::new("project")
-                .help("Project name")
+                .help("Event project name")
                 .required(true)
                 .short('p')
                 .long("project"),
         )
         .arg(
             Arg::new("tag")
-                .help("Tag(s) for the time entry")
+                .help("Event tag(s)")
                 .short('t')
                 .long("tag"),
         )
         .arg(
             Arg::new("description")
-                .help("Time entry description")
+                .help("Event description")
                 .short('d')
                 .long("description"),
         )
@@ -57,7 +57,7 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
         vec![]
     };
 
-    let entry = TrackedEntry {
+    let event = TimeEvent {
         description: args
             .get_one::<String>("description")
             .cloned()
@@ -72,8 +72,8 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
         total_duration: None,
     };
 
-    entry.save()?;
-    print_table(entry.to_table("Saved"), plain_table(), [1, 1]);
+    event.save()?;
+    print_table(event.to_table("Saved"), plain_table(), [1, 1]);
 
     Ok(0)
 }

@@ -1,4 +1,4 @@
-use crate::entries::{TrackedEntry, find_tracked_entries};
+use crate::event::{TimeEvent, find_events};
 use crate::styling::{DASH, plain_table, print_table, regular_table};
 use crate::utils::{format_date, format_duration, to_naive_date_time};
 use chrono::Datelike;
@@ -13,13 +13,13 @@ pub fn command() -> Command {
         .about("Show time spent")
         .arg(
             Arg::new("project")
-                .help("Project name")
+                .help("Event project name")
                 .short('p')
                 .long("project"),
         )
         .arg(
             Arg::new("tag")
-                .help("Tag(s) to filter by")
+                .help("Event tag(s) to filter by")
                 .short('t')
                 .long("tag"),
         )
@@ -53,83 +53,83 @@ fn is_same_date(a: &chrono::NaiveDateTime, b: &chrono::NaiveDateTime) -> bool {
 pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
     let since = to_naive_date_time(args.get_one::<String>("since"), None)?;
     let until = to_naive_date_time(args.get_one::<String>("until"), None)?;
-    let tracked_entries = find_tracked_entries(&since.date(), &until.date());
+    let events = find_events(&since.date(), &until.date());
 
     let arg_group = args.get_one::<String>("group").expect("Default missing");
-    let mut grouped_entry = TrackedEntry {
-        ..TrackedEntry::default()
+    let mut grouped_event = TimeEvent {
+        ..TimeEvent::default()
     };
 
     let mut report = Table::new();
     report.set_titles(row!["Date", "Project", "Start", "Stop", "Duration", "Tags"]);
 
-    let mut total_entries = 0;
+    let mut total_events = 0;
     let mut total_duration = chrono::Duration::zero();
 
-    let mut tracked_entries = tracked_entries
+    let mut events = events
         .iter()
         .filter(|e| e.matches_args(args))
         .peekable();
 
-    while let Some(entry) = tracked_entries.next() {
-        let duration = entry.duration();
+    while let Some(event) = events.next() {
+        let duration = event.duration();
         total_duration += duration;
-        total_entries += 1;
+        total_events += 1;
 
-        let same_date_tomorrow = if let Some(next_entry) = tracked_entries.peek() {
-            is_same_date(&entry.start, &next_entry.start)
+        let same_date_tomorrow = if let Some(next_event) = events.peek() {
+            is_same_date(&event.start, &next_event.start)
         } else {
             false
         };
 
-        // Group entries by day
-        let (entry, duration) = if arg_group == "day" {
-            if grouped_entry.total_duration.is_none() {
-                grouped_entry = TrackedEntry {
-                    description: entry.description.clone(),
+        // Group events by day
+        let (event, duration) = if arg_group == "day" {
+            if grouped_event.total_duration.is_none() {
+                grouped_event = TimeEvent {
+                    description: event.description.clone(),
                     total_duration: Some(duration),
-                    project: entry.project.clone(),
-                    start: entry.start,
-                    stop: entry.stop,
-                    tags: entry.tags.clone(),
+                    project: event.project.clone(),
+                    start: event.start,
+                    stop: event.stop,
+                    tags: event.tags.clone(),
                 };
-            } else if is_same_date(&grouped_entry.start, &entry.start) {
-                grouped_entry.tags.extend(entry.tags.clone());
-                grouped_entry.total_duration =
-                    Some(grouped_entry.total_duration.unwrap() + duration);
+            } else if is_same_date(&grouped_event.start, &event.start) {
+                grouped_event.tags.extend(event.tags.clone());
+                grouped_event.total_duration =
+                    Some(grouped_event.total_duration.unwrap() + duration);
             }
 
             if same_date_tomorrow {
                 continue;
             }
 
-            (&grouped_entry, grouped_entry.total_duration.unwrap())
+            (&grouped_event, grouped_event.total_duration.unwrap())
         } else {
-            (entry, duration)
+            (event, duration)
         };
 
-        let stop = if let Some(d) = entry.stop {
+        let stop = if let Some(d) = event.stop {
             format_date(&d, "hm")
         } else {
             DASH.to_string()
         };
 
         report.add_row(Row::new(vec![
-            Cell::new(&format_date(&entry.start, "ymd")),
-            Cell::new(&entry.project),
-            Cell::new(&format_date(&entry.start, "hm")),
+            Cell::new(&format_date(&event.start, "ymd")),
+            Cell::new(&event.project),
+            Cell::new(&format_date(&event.start, "hm")),
             Cell::new(&stop),
             Cell::new(&format_duration(&duration)).style_spec("r"),
-            Cell::new(&entry.tags_as_string()),
+            Cell::new(&event.tags_as_string()),
         ]));
 
         if !same_date_tomorrow {
-            grouped_entry.total_duration = None;
+            grouped_event.total_duration = None;
         }
     }
 
     let mut summary = Table::new();
-    summary.add_row(row!["Total entries:", total_entries.to_string()]);
+    summary.add_row(row!["Total events:", total_events.to_string()]);
     summary.add_row(row!["Total time:", &format_duration(&total_duration)]);
 
     print_table(report, regular_table(), [1, 1]);
