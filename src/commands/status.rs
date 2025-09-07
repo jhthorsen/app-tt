@@ -24,6 +24,7 @@ pub fn run(_args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
     summary.add_row(row!["Duration", &format_duration(&entry.duration())]);
     summary.add_row(row!["Tags", &entry.tags_as_string()]);
     summary.add_row(row!["Description", &entry.description()]);
+    summary.add_row(row!["File", &entry.path().to_string_lossy()]);
     print_table(summary, plain_table(), [1, 1]);
 
     Ok(0)
