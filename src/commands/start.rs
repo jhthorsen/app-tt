@@ -1,6 +1,6 @@
-use crate::entries::TrackedEntry;
+use crate::entries::{TrackedEntry, find_last_tracked_entry};
 use crate::styling::{plain_table, print_table};
-use crate::utils::{default_project, format_date, to_naive_date_time};
+use crate::utils::{default_project, format_date, min_duration, to_naive_date_time};
 use clap::{Arg, Command};
 use prettytable::{Table, row};
 
@@ -34,7 +34,19 @@ pub fn command() -> clap::Command {
 }
 
 pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
-    // TODO: Stop active entry, if any
+    let start = to_naive_date_time(args.get_one::<String>("start_time"), None)?;
+
+    // Stop current entry if not already stopped
+    if let Ok(mut entry) = find_last_tracked_entry()
+        && entry.stop.is_none()
+    {
+        entry.stop = Some(start);
+        if entry.duration().num_seconds() < min_duration()? {
+            entry.delete()?;
+        } else {
+            entry.save()?;
+        }
+    }
 
     let tags = if let Some(tag) = args.get_one::<String>("tag") {
         tag.split(',').map(|s| s.trim().to_string()).collect()
@@ -51,7 +63,7 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
             .get_one::<String>("project")
             .unwrap_or(&default_project())
             .to_owned(),
-        start: to_naive_date_time(args.get_one::<String>("start_time"), None)?,
+        start,
         stop: None,
         tags,
         total_duration: None,
@@ -64,8 +76,8 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
     summary.add_row(row!["Project", &entry.project]);
     summary.add_row(row!["Start", format_date(&entry.start, "full")]);
     summary.add_row(row!["Tags", &entry.tags_as_string()]);
-    summary.add_row(row!["File", &entry.path().to_string_lossy()]);
     summary.add_row(row!["Description", &entry.description()]);
+    summary.add_row(row!["File", &entry.path().to_string_lossy()]);
     print_table(summary, plain_table(), [1, 1]);
 
     Ok(0)

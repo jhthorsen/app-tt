@@ -1,4 +1,5 @@
 use crate::styling::DASH;
+use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use std::fs::DirEntry;
 use std::str::FromStr;
@@ -170,6 +171,34 @@ fn file_entry_in_date_range(
     };
 
     entry_date >= *since && entry_date <= *until
+}
+
+pub fn find_last_tracked_entry() -> Result<TrackedEntry, anyhow::Error> {
+    let mut years = read_dir(crate::utils::tracker_dir());
+    years.sort_by_key(|d| d.file_name());
+
+    for year_dir in years.iter().rev() {
+        let mut months = read_dir(year_dir.path());
+        months.sort_by_key(|d| d.file_name());
+
+        for month_dir in months.iter().rev() {
+            let mut files = read_dir(month_dir.path());
+            files.sort_by_key(|d| d.file_name());
+            for file in files.iter().rev() {
+                let path = file.path();
+                let ext = path.extension().and_then(|s| s.to_str());
+                if ext != Some("trc") && ext != Some("json") {
+                    continue;
+                }
+
+                if let Ok(entry) = TrackedEntry::from_file(file) {
+                    return Ok(entry);
+                }
+            }
+        }
+    }
+
+    Err(anyhow!("Unable to find the last tracked entry"))
 }
 
 pub fn find_tracked_entries(
