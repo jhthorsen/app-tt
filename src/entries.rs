@@ -1,55 +1,82 @@
-use serde::{Deserialize, Serialize, Serializer};
+use crate::styling::DASH;
+use serde::{Deserialize, Serialize};
 use std::fs::DirEntry;
 use std::str::FromStr;
 
-use crate::styling::DASH;
+const RFC3339_FORMAT: &str = "%Y-%m-%dT%H:%M:%S";
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+// Required, since the files on disk has very strange formats
+#[derive(Deserialize, Serialize)]
+struct FileEntry {
+    #[serde(rename = "__CLASS__")]
+    class: Option<String>,
+    description: Option<String>,
+    duration: Option<String>,
+    project: String,
+    seconds: Option<i64>,
+    start: String,
+    stop: Option<String>,
+    tags: Vec<String>,
+    user: Option<String>,
+}
+
+#[derive(Default)]
 pub struct TrackedEntry {
-    pub description: Option<String>,
+    pub description: String,
     pub project: String,
-    #[serde(skip_deserializing)]
     pub total_duration: Option<chrono::Duration>,
-    #[serde(serialize_with = "serialize_naive_datetime")]
     pub start: chrono::NaiveDateTime,
-    #[serde(serialize_with = "serialize_option_naive_datetime")]
     pub stop: Option<chrono::NaiveDateTime>,
     pub tags: Vec<String>,
 }
 
-pub fn serialize_naive_datetime<S>(
-    d: &chrono::NaiveDateTime,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    serializer.serialize_str(&d.format("%Y-%m-%dT%H:%M:%S").to_string())
-}
+impl From<FileEntry> for TrackedEntry {
+    fn from(value: FileEntry) -> Self {
+        let start = chrono::NaiveDateTime::parse_from_str(&value.start, RFC3339_FORMAT)
+            .unwrap_or_else(|_| chrono::Local::now().naive_local());
 
-pub fn serialize_option_naive_datetime<S>(
-    d: &Option<chrono::NaiveDateTime>,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    if let Some(d) = d {
-        serializer.serialize_str(&d.format("%Y-%m-%dT%H:%M:%S").to_string())
-    } else {
-        serializer.serialize_str("")
+        let stop = value
+            .stop
+            .and_then(|s| chrono::NaiveDateTime::parse_from_str(&s, RFC3339_FORMAT).ok());
+
+        TrackedEntry {
+            description: value.description.unwrap_or_default(),
+            project: value.project,
+            total_duration: None,
+            start,
+            stop,
+            tags: value.tags,
+        }
     }
 }
 
 impl TrackedEntry {
-    pub fn description(&self) -> &str {
-        if let Some(d) = &self.description
-            && !d.is_empty()
-        {
-            return d;
+    fn as_file_entry(&self) -> FileEntry {
+        let duration = self.duration();
+        FileEntry {
+            class: Some("App::TimeTracker::Data::Task".to_string()),
+            description: Some(self.description.clone()),
+            duration: Some(format!(
+                "{:02}:{:02}:{:02}",
+                duration.num_hours(),
+                duration.num_minutes() % 60,
+                duration.num_seconds() % 60
+            )),
+            project: self.project.clone(),
+            seconds: Some(self.duration().num_seconds()),
+            start: self.start.format(RFC3339_FORMAT).to_string(),
+            stop: self.stop.map(|s| s.format(RFC3339_FORMAT).to_string()),
+            tags: self.tags.clone(),
+            user: std::env::var("USER").ok(),
         }
+    }
 
-        DASH
+    pub fn description(&self) -> &str {
+        if self.description.is_empty() {
+            DASH
+        } else {
+            &self.description
+        }
     }
 
     pub fn duration(&self) -> chrono::Duration {
@@ -60,8 +87,8 @@ impl TrackedEntry {
 
     pub fn from_file(file: &DirEntry) -> Result<TrackedEntry, anyhow::Error> {
         let content = std::fs::read_to_string(file.path())?;
-        let entry: TrackedEntry = serde_json::from_str(&content)?;
-        Ok(entry)
+        let entry: FileEntry = serde_json::from_str(&content)?;
+        Ok(entry.into())
     }
 
     pub fn matches_args(&self, args: &clap::ArgMatches) -> bool {
