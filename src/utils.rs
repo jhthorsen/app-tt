@@ -32,6 +32,12 @@ pub fn is_same_date(a: &chrono::NaiveDateTime, b: &chrono::NaiveDateTime) -> boo
     a.year() == b.year() && a.month() == b.month() && a.day() == b.day()
 }
 
+pub fn min_duration() -> Result<i64, anyhow::Error> {
+    Ok(std::env::var("TT_MIN_DURATION")
+        .unwrap_or_else(|_| "300".to_string())
+        .parse()?)
+}
+
 pub fn to_naive_date_time(
     human_date: Option<&String>,
     now: Option<&chrono::NaiveDateTime>,

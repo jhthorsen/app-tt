@@ -72,6 +72,10 @@ impl TrackedEntry {
         }
     }
 
+    pub fn delete(&self) -> Result<(), anyhow::Error> {
+        Ok(std::fs::remove_file(self.path())?)
+    }
+
     pub fn description(&self) -> &str {
         if self.description.is_empty() {
             DASH
