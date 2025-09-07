@@ -1,16 +1,44 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize, Serializer};
 use std::fs::DirEntry;
 use std::str::FromStr;
 
-#[derive(Debug, Default, Deserialize)]
+use crate::styling::DASH;
+
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub struct TrackedEntry {
     pub description: Option<String>,
     pub project: String,
     #[serde(skip_deserializing)]
     pub total_duration: Option<chrono::Duration>,
+    #[serde(serialize_with = "serialize_naive_datetime")]
     pub start: chrono::NaiveDateTime,
+    #[serde(serialize_with = "serialize_option_naive_datetime")]
     pub stop: Option<chrono::NaiveDateTime>,
     pub tags: Vec<String>,
+}
+
+pub fn serialize_naive_datetime<S>(
+    d: &chrono::NaiveDateTime,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&d.format("%Y-%m-%dT%H:%M:%S").to_string())
+}
+
+pub fn serialize_option_naive_datetime<S>(
+    d: &Option<chrono::NaiveDateTime>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    if let Some(d) = d {
+        serializer.serialize_str(&d.format("%Y-%m-%dT%H:%M:%S").to_string())
+    } else {
+        serializer.serialize_str("")
+    }
 }
 
 impl TrackedEntry {
@@ -21,7 +49,7 @@ impl TrackedEntry {
             return d;
         }
 
-        crate::styling::DASH
+        DASH
     }
 
     pub fn duration(&self) -> chrono::Duration {

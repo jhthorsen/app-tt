@@ -1,6 +1,6 @@
 use crate::entries::{TrackedEntry, find_tracked_entries};
 use crate::styling::{DASH, plain_table, print_table, regular_table};
-use crate::utils::{format_date, format_duration, is_same_date, to_naive_date};
+use crate::utils::{format_date, format_duration, is_same_date, to_naive_date_time};
 use chrono::Datelike;
 use clap::{Arg, Command};
 use prettytable::{Cell, Row, Table, row};
@@ -47,9 +47,9 @@ pub fn command() -> Command {
 }
 
 pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
-    let since = to_naive_date(args.get_one::<String>("since"));
-    let until = to_naive_date(args.get_one::<String>("until"));
-    let tracked_entries = find_tracked_entries(&since, &until);
+    let since = to_naive_date_time(args.get_one::<String>("since"), None)?;
+    let until = to_naive_date_time(args.get_one::<String>("until"), None)?;
+    let tracked_entries = find_tracked_entries(&since.date(), &until.date());
 
     let arg_group = args.get_one::<String>("group").expect("Default missing");
     let mut grouped_entry = TrackedEntry {
