@@ -115,7 +115,7 @@ impl TrackedEntry {
     }
 
     pub fn path(&self) -> std::path::PathBuf {
-        crate::utils::tracker_dir().join(
+        tracker_dir().join(
             format!(
                 "{}_{}.trc",
                 self.start.format("%Y/%m/%Y%m%d-%H%M%S"),
@@ -199,7 +199,7 @@ fn file_entry_in_date_range(
 }
 
 pub fn find_last_tracked_entry() -> Result<TrackedEntry, anyhow::Error> {
-    let mut years = read_dir(crate::utils::tracker_dir());
+    let mut years = read_dir(tracker_dir());
     years.sort_by_key(|d| d.file_name());
 
     for year_dir in years.iter().rev() {
@@ -231,7 +231,7 @@ pub fn find_tracked_entries(
     until: &chrono::NaiveDate,
 ) -> Vec<TrackedEntry> {
     let mut all_entries = vec![];
-    for year_dir in read_dir(crate::utils::tracker_dir()) {
+    for year_dir in read_dir(tracker_dir()) {
         for month_dir in read_dir(year_dir.path()) {
             for file in read_dir(month_dir.path()) {
                 if !file_entry_in_date_range(&file, since, until) {
@@ -259,4 +259,11 @@ fn read_dir(path: impl AsRef<std::path::Path>) -> Vec<DirEntry> {
     std::fs::read_dir(path)
         .map(|rd| rd.filter_map(Result::ok).collect())
         .unwrap_or_default()
+}
+
+fn tracker_dir() -> std::path::PathBuf {
+    let home = std::env::var("HOME").expect("Can't find ~/.TimeTracker, without  being set");
+    format!("{}/.TimeTracker", home)
+        .parse::<std::path::PathBuf>()
+        .unwrap()
 }

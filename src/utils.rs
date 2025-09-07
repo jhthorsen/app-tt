@@ -1,17 +1,4 @@
 use anyhow::anyhow;
-use chrono::Datelike;
-
-pub fn default_project() -> String {
-    if let Ok(from_env) = std::env::var("TT_DEFAULT_PROJECT") {
-        return from_env;
-    } else if let Ok(from_cwd) = std::env::current_dir()
-        && let Some(name) = from_cwd.file_name()
-    {
-        return name.to_string_lossy().to_string();
-    }
-
-    "default".to_string()
-}
 
 pub fn format_date(d: &chrono::NaiveDateTime, format: &'static str) -> String {
     match format {
@@ -26,10 +13,6 @@ pub fn format_duration(duration: &chrono::Duration) -> String {
     let hours = duration.num_hours();
     let minutes = duration.num_minutes() % 60;
     format!("{}h {:02}m", hours, minutes)
-}
-
-pub fn is_same_date(a: &chrono::NaiveDateTime, b: &chrono::NaiveDateTime) -> bool {
-    a.year() == b.year() && a.month() == b.month() && a.day() == b.day()
 }
 
 pub fn min_duration() -> Result<i64, anyhow::Error> {
@@ -78,13 +61,6 @@ pub fn to_naive_date_time(
     date_str
         .parse::<chrono::NaiveDateTime>()
         .map_err(|_| anyhow!("Unable to parse date \"{human_date}\""))
-}
-
-pub fn tracker_dir() -> std::path::PathBuf {
-    let home = std::env::var("HOME").expect("Can't find ~/.TimeTracker, without  being set");
-    format!("{}/.TimeTracker", home)
-        .parse::<std::path::PathBuf>()
-        .unwrap()
 }
 
 #[cfg(test)]

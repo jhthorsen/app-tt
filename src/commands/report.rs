@@ -1,6 +1,6 @@
 use crate::entries::{TrackedEntry, find_tracked_entries};
 use crate::styling::{DASH, plain_table, print_table, regular_table};
-use crate::utils::{format_date, format_duration, is_same_date, to_naive_date_time};
+use crate::utils::{format_date, format_duration, to_naive_date_time};
 use chrono::Datelike;
 use clap::{Arg, Command};
 use prettytable::{Cell, Row, Table, row};
@@ -44,6 +44,10 @@ pub fn command() -> Command {
                 .default_value("none")
                 .default_missing_value("day"),
         )
+}
+
+fn is_same_date(a: &chrono::NaiveDateTime, b: &chrono::NaiveDateTime) -> bool {
+    a.year() == b.year() && a.month() == b.month() && a.day() == b.day()
 }
 
 pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
