@@ -1,5 +1,7 @@
 use crate::styling::DASH;
+use crate::utils::{format_date, format_duration};
 use anyhow::anyhow;
+use prettytable::{Table, row};
 use serde::{Deserialize, Serialize};
 use std::fs::DirEntry;
 use std::str::FromStr;
@@ -143,6 +145,25 @@ impl TrackedEntry {
         std::fs::create_dir_all(path.parent().expect("Invalid path: {path}"))?;
         std::fs::write(&path, serde_json::to_string(&self.as_file_entry())?)?;
         Ok(())
+    }
+
+    pub fn to_table(&self, status: &str) -> Table {
+        let stop = if let Some(d) = self.stop {
+            format_date(&d, "full")
+        } else {
+            DASH.to_string()
+        };
+
+        let mut t = Table::new();
+        t.add_row(row!["Status", status]);
+        t.add_row(row!["Project", self.project]);
+        t.add_row(row!["Duration", format_duration(&self.duration())]);
+        t.add_row(row!["Start", format_date(&self.start, "full")]);
+        t.add_row(row!["Stop", stop]);
+        t.add_row(row!["Tags", self.tags_as_string()]);
+        t.add_row(row!["Description", self.description()]);
+        t.add_row(row!["File", self.path().to_string_lossy()]);
+        t
     }
 }
 

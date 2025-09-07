@@ -1,8 +1,7 @@
 use crate::entries::{TrackedEntry, find_last_tracked_entry};
 use crate::styling::{plain_table, print_table};
-use crate::utils::{default_project, format_date, min_duration, to_naive_date_time};
+use crate::utils::{default_project, min_duration, to_naive_date_time};
 use clap::{Arg, Command};
-use prettytable::{Table, row};
 
 pub fn command() -> clap::Command {
     Command::new("start")

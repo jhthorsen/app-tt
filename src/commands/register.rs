@@ -1,8 +1,7 @@
 use crate::entries::TrackedEntry;
 use crate::styling::{plain_table, print_table};
-use crate::utils::{format_date, to_naive_date_time};
+use crate::utils::to_naive_date_time;
 use clap::{Arg, Command};
-use prettytable::{Table, row};
 
 pub fn command() -> Command {
     let example_time = chrono::Local::now().naive_local().format("%Y-%m-%dT%H:%M");
@@ -57,6 +56,7 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
     } else {
         vec![]
     };
+
     let entry = TrackedEntry {
         description: args
             .get_one::<String>("description")
@@ -73,15 +73,7 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
     };
 
     entry.save()?;
-
-    let mut summary = Table::new();
-    summary.add_row(row!["Status", "Saved"]);
-    summary.add_row(row!["Project", &entry.project]);
-    summary.add_row(row!["Start", format_date(&entry.start, "full")]);
-    summary.add_row(row!["Tags", &entry.tags_as_string()]);
-    summary.add_row(row!["Description", &entry.description()]);
-    summary.add_row(row!["File", &entry.path().to_string_lossy()]);
-    print_table(summary, plain_table(), [1, 1]);
+    print_table(entry.to_table("Saved"), plain_table(), [1, 1]);
 
     Ok(0)
 }
