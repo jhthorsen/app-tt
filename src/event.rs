@@ -23,7 +23,7 @@ struct FileEvent {
     user: Option<String>,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct TimeEvent {
     pub description: String,
     pub project: String,
@@ -54,26 +54,6 @@ impl From<FileEvent> for TimeEvent {
 }
 
 impl TimeEvent {
-    fn as_file_event(&self) -> FileEvent {
-        let duration = self.duration();
-        FileEvent {
-            class: Some("App::TimeTracker::Data::Task".to_string()),
-            description: Some(self.description.clone()),
-            duration: Some(format!(
-                "{:02}:{:02}:{:02}",
-                duration.num_hours(),
-                duration.num_minutes() % 60,
-                duration.num_seconds() % 60
-            )),
-            project: self.project.clone(),
-            seconds: Some(self.duration().num_seconds()),
-            start: self.start.format(RFC3339_FORMAT).to_string(),
-            stop: self.stop.map(|s| s.format(RFC3339_FORMAT).to_string()),
-            tags: self.tags.clone(),
-            user: std::env::var("USER").ok(),
-        }
-    }
-
     pub fn delete(&self) -> Result<(), anyhow::Error> {
         Ok(std::fs::remove_file(self.path())?)
     }
@@ -92,9 +72,8 @@ impl TimeEvent {
             - self.start
     }
 
-    pub fn from_file(file: &DirEntry) -> Result<TimeEvent, anyhow::Error> {
-        let file_content = std::fs::read_to_string(file.path())?;
-        Ok(serde_json::from_str::<FileEvent>(&file_content)?.into())
+    pub fn from_string(content: &str) -> Result<TimeEvent, anyhow::Error> {
+        Ok(serde_json::from_str::<FileEvent>(content)?.into())
     }
 
     pub fn matches_args(&self, args: &clap::ArgMatches) -> bool {
@@ -142,8 +121,33 @@ impl TimeEvent {
     pub fn save(&self) -> Result<(), anyhow::Error> {
         let path = self.path();
         std::fs::create_dir_all(path.parent().expect("Invalid path: {path}"))?;
-        std::fs::write(&path, serde_json::to_string(&self.as_file_event())?)?;
-        Ok(())
+        Ok(std::fs::write(&path, &self.serialize(false)?)?)
+    }
+
+    pub fn serialize(&self, pretty: bool) -> Result<String, anyhow::Error> {
+        let duration = self.duration();
+        let file_event = FileEvent {
+            class: Some("App::TimeTracker::Data::Task".to_string()),
+            description: Some(self.description.clone()),
+            duration: Some(format!(
+                "{:02}:{:02}:{:02}",
+                duration.num_hours(),
+                duration.num_minutes() % 60,
+                duration.num_seconds() % 60
+            )),
+            project: self.project.clone(),
+            seconds: Some(self.duration().num_seconds()),
+            start: self.start.format(RFC3339_FORMAT).to_string(),
+            stop: self.stop.map(|s| s.format(RFC3339_FORMAT).to_string()),
+            tags: self.tags.clone(),
+            user: std::env::var("USER").ok(),
+        };
+
+        if pretty {
+            Ok(serde_json::to_string_pretty(&file_event)?)
+        } else {
+            Ok(serde_json::to_string(&file_event)?)
+        }
     }
 
     pub fn to_table(&self, status: &str) -> Table {
@@ -215,7 +219,8 @@ pub fn find_last_event() -> Result<TimeEvent, anyhow::Error> {
                     continue;
                 }
 
-                if let Ok(event) = TimeEvent::from_file(file) {
+                let content = std::fs::read_to_string(file.path())?;
+                if let Ok(event) = TimeEvent::from_string(&content) {
                     return Ok(event);
                 }
             }
@@ -240,7 +245,9 @@ pub fn find_events(since: &chrono::NaiveDate, until: &chrono::NaiveDate) -> Vec<
                     continue;
                 }
 
-                if let Ok(event) = TimeEvent::from_file(&file) {
+                if let Ok(content) = std::fs::read_to_string(file.path())
+                    && let Ok(event) = TimeEvent::from_string(&content)
+                {
                     events.push(event);
                 }
             }

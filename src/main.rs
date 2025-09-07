@@ -23,6 +23,7 @@ fn main() {
         .subcommand(commands::status::command())
         .subcommand(commands::report::command())
         .subcommand(commands::register::command())
+        .subcommand(commands::edit::command())
         .get_matches();
 
     let exit_code = match matches.subcommand() {
@@ -30,6 +31,7 @@ fn main() {
         Some(("stop", args)) => commands::stop::run(args),
         Some(("report", args)) => commands::report::run(args),
         Some(("register", args)) => commands::register::run(args),
+        Some(("edit", args)) => commands::edit::run(args),
         _ => commands::status::run(&matches),
     };
 
