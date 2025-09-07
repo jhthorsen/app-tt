@@ -52,19 +52,7 @@ fn not_too_old_to_resume(entry: &TrackedEntry, max_age: i64) -> bool {
 
 pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
     let start = to_naive_date_time(args.get_one::<String>("start_time"), None)?;
-
-    // Stop current entry if not already stopped
-    if !args.contains_id("resume")
-        && let Ok(mut last) = find_last_tracked_entry()
-        && last.stop.is_none()
-    {
-        last.stop = Some(start);
-        if last.duration().num_seconds() < min_duration()? {
-            last.delete()?;
-        } else {
-            last.save()?;
-        }
-    }
+    let mut last = find_last_tracked_entry().unwrap_or_default();
 
     let tags = if let Some(tag) = args.get_one::<String>("tag") {
         tag.split(',').map(|s| s.trim().to_string()).collect()
@@ -73,23 +61,37 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
     };
 
     let mut status = "Started";
-
+    let resume = args.get_one::<i64>("resume");
     let project = args
         .get_one::<String>("project")
         .unwrap_or(&default_project())
         .to_owned();
 
-    let entry = if let Some(max_age) = args.get_one::<i64>("resume")
-        && let Ok(mut last) = find_last_tracked_entry()
-        && not_too_old_to_resume(&last, *max_age)
+    let entry = if let Some(max_age) = resume
         && last.project == project
+        && last.stop.is_some()
+        && not_too_old_to_resume(&last, *max_age)
     {
         status = "Resumed";
         last.stop = None;
         last.tags.extend(tags);
+        last.save()?;
+        last
+    } else if !last.project.is_empty() && last.stop.is_none() {
+        status = "Tracking";
         last
     } else {
-        TrackedEntry {
+        // Stop current entry if not already stopped
+        if !last.project.is_empty() && last.stop.is_none() {
+            last.stop = Some(start);
+            if last.duration().num_seconds() < min_duration()? {
+                last.delete()?;
+            } else {
+                last.save()?;
+            }
+        }
+
+        let new = TrackedEntry {
             description: args
                 .get_one::<String>("description")
                 .cloned()
@@ -99,19 +101,12 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
             stop: None,
             tags,
             total_duration: None,
-        }
+        };
+        new.save()?;
+        new
     };
 
-    entry.save()?;
-
-    let mut summary = Table::new();
-    summary.add_row(row!["Status", status]);
-    summary.add_row(row!["Project", &entry.project]);
-    summary.add_row(row!["Start", format_date(&entry.start, "full")]);
-    summary.add_row(row!["Tags", &entry.tags_as_string()]);
-    summary.add_row(row!["Description", &entry.description()]);
-    summary.add_row(row!["File", &entry.path().to_string_lossy()]);
-    print_table(summary, plain_table(), [1, 1]);
+    print_table(entry.to_table(status), plain_table(), [1, 1]);
 
     Ok(0)
 }
