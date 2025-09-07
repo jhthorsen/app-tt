@@ -35,7 +35,7 @@ pub fn command() -> clap::Command {
                 .help("Resume if stopped")
                 .long("resume")
                 .num_args(0..=1)
-                .default_missing_value("300")
+                .default_missing_value("600")
                 .value_parser(clap::value_parser!(i64)),
         )
         .arg(crate::quiet_arg())
