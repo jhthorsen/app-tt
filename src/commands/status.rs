@@ -3,7 +3,7 @@ use crate::styling::{plain_table, print_table};
 use clap::Command;
 
 pub fn command() -> Command {
-    Command::new("status").about("Show the current time tracking status")
+    Command::new("status").about("Show the current time tracking status (default)")
 }
 
 pub fn run(_args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {

@@ -9,7 +9,7 @@ pub fn command() -> Command {
     let example_time = last.start.format("%Y-%m-%dT%H:%M:%S");
 
     Command::new("edit")
-        .about("Edit event")
+        .about("Edit event(s)")
         .arg(
             Arg::new("since")
                 .help("From what start time for event(s) to edit")

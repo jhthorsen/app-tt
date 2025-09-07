@@ -5,7 +5,7 @@ use clap::{Arg, Command};
 
 pub fn command() -> Command {
     Command::new("stop")
-        .about("Stop the application")
+        .about("Stop tracking time")
         .arg(
             Arg::new("stop_time")
                 .help("The stop time for tracking (e.g., '08:00')")

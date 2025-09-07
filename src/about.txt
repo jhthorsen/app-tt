@@ -1,0 +1,23 @@
+A simple command line time tracker
+
+"tt" is a time tracker tool, that is designed to not get in your way,
+but rather do exactly what you need it to do, and nothing more.
+
+Here is a common workflow, where you start tracking time, do some work,
+and then stop the event at some later point:
+
+  # -p defaults to the current working directory name
+  # 08:00 defaults to the current time
+  $ tt start -p work 08:00
+
+  # Do some work
+  $ $EDITOR src/main.rs
+
+  # 17:00 defaults to the current time
+  $ tt stop 17:00
+
+At any time, you can inspect all previous events using the "report"
+sub command or the current event with "status".
+
+The "register" and "edit" commands can be used to add missed events
+or change existing logged events.

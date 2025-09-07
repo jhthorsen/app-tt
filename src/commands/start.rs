@@ -18,12 +18,7 @@ pub fn command() -> clap::Command {
                 .short('p')
                 .long("project"),
         )
-        .arg(
-            Arg::new("tag")
-                .help("Event tag(s)")
-                .short('t')
-                .long("tag"),
-        )
+        .arg(Arg::new("tag").help("Event tag(s)").short('t').long("tag"))
         .arg(
             Arg::new("description")
                 .help("Event description")
@@ -42,9 +37,7 @@ pub fn command() -> clap::Command {
 }
 
 fn default_project() -> String {
-    if let Ok(from_env) = std::env::var("TT_DEFAULT_PROJECT") {
-        return from_env;
-    } else if let Ok(from_cwd) = std::env::current_dir()
+    if let Ok(from_cwd) = std::env::current_dir()
         && let Some(name) = from_cwd.file_name()
     {
         return name.to_string_lossy().to_string();

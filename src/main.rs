@@ -16,7 +16,7 @@ fn quiet_arg() -> Arg {
 fn main() {
     let matches = Command::new("tt")
         .version(env!("CARGO_PKG_VERSION"))
-        .about("Time tracking app")
+        .about(include_str!("about.txt"))
         .author("Jan Henning Thorsen <jan.henning@thorsenlabs.com>")
         .subcommand(commands::start::command())
         .subcommand(commands::stop::command())
