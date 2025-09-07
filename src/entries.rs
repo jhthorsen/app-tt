@@ -107,12 +107,37 @@ impl TrackedEntry {
         true
     }
 
+    pub fn path(&self) -> std::path::PathBuf {
+        crate::utils::tracker_dir().join(
+            format!(
+                "{}_{}.trc",
+                self.start.format("%Y/%m/%Y%m%d-%H%M%S"),
+                self.project,
+            )
+            .parse::<std::path::PathBuf>()
+            .unwrap(),
+        )
+    }
+
     pub fn tags_as_string(&self) -> String {
-        std::collections::HashSet::<&String>::from_iter(self.tags.iter())
+        let tags = std::collections::HashSet::<&String>::from_iter(self.tags.iter())
             .iter()
             .map(|s| s.to_string())
             .collect::<Vec<String>>()
-            .join(",")
+            .join(",");
+
+        if tags.is_empty() {
+            DASH.to_string()
+        } else {
+            tags
+        }
+    }
+
+    pub fn save(&self) -> Result<(), anyhow::Error> {
+        let path = self.path();
+        std::fs::create_dir_all(path.parent().expect("Invalid path: {path}"))?;
+        std::fs::write(&path, serde_json::to_string(&self.as_file_entry())?)?;
+        Ok(())
     }
 }
 
@@ -152,7 +177,7 @@ pub fn find_tracked_entries(
     until: &chrono::NaiveDate,
 ) -> Vec<TrackedEntry> {
     let mut all_entries = vec![];
-    for year_dir in read_dir(tracker_dir()) {
+    for year_dir in read_dir(crate::utils::tracker_dir()) {
         for month_dir in read_dir(year_dir.path()) {
             for file in read_dir(month_dir.path()) {
                 if !file_entry_in_date_range(&file, since, until) {
@@ -180,9 +205,4 @@ fn read_dir(path: impl AsRef<std::path::Path>) -> Vec<DirEntry> {
     std::fs::read_dir(path)
         .map(|rd| rd.filter_map(Result::ok).collect())
         .unwrap_or_default()
-}
-
-fn tracker_dir() -> String {
-    let home = std::env::var("HOME").expect("Can't find ~/.TimeTracker, without  being set");
-    format!("{}/.TimeTracker", home)
 }
