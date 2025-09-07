@@ -30,13 +30,13 @@ At any time, you can inspect all previous events using the [`report`](#report) s
 
 ## Installation
 
-You need to install [`cargo`](https://rustup.rs) somehow. After that, you can build and install this repo with the following command:
+You need to install [`cargo`](https://rustup.rs) somehow. After that, you can build and install "tt" with the following command:
 
 ```bash
 # Install cargo with homebrew
 $ brew install rust
 
-# Install
+# Install (will print location of binary to screen)
 $ cargo install --git https://github.com/jhthorsen/app-tt
 
 # Uninstall
@@ -143,12 +143,12 @@ This program used to be written in Perl, but I have lately seen that the [rust](
 
 It is inspired by [App::TimeTracker](https://metacpan.org/pod/App%3A%3ATimeTracker) and share the same log file format, but it has (in my humble opinion) a simpler interface. Either way, this version is way faster.
 
-# Copyright and license
+## Copyright and license
 
 Copyright (C) 2025, Jan Henning Thorsen
 
 This program is free software, you can redistribute it and/or modify it under the terms of the Artistic License version 2.0.
 
-# Author
+## Author
 
 Jan Henning Thorsen - `jan.henning@thorsenlabs.com`
