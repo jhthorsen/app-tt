@@ -1,9 +1,17 @@
-mod entries;
 mod commands;
+mod entries;
 mod styling;
 mod utils;
 
-use clap::Command;
+use clap::{Arg, ArgAction, Command};
+
+fn quiet_arg() -> Arg {
+    Arg::new("quiet")
+        .help("As little output as possible")
+        .long("quiet")
+        .num_args(0)
+        .action(ArgAction::SetTrue)
+}
 
 fn main() {
     let matches = Command::new("tt")

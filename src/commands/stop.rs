@@ -4,12 +4,15 @@ use crate::utils::{min_duration, to_naive_date_time};
 use clap::{Arg, Command};
 
 pub fn command() -> Command {
-    Command::new("stop").about("Stop the application").arg(
-        Arg::new("stop_time")
-            .help("The stop time for tracking (e.g., '08:00')")
-            .default_value("now")
-            .index(1),
-    )
+    Command::new("stop")
+        .about("Stop the application")
+        .arg(
+            Arg::new("stop_time")
+                .help("The stop time for tracking (e.g., '08:00')")
+                .default_value("now")
+                .index(1),
+        )
+        .arg(crate::quiet_arg())
 }
 
 pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
@@ -32,7 +35,9 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
         }
     }
 
-    print_table(entry.to_table(status), plain_table(), [1, 1]);
+    if !args.get_flag("quiet") {
+        print_table(entry.to_table(status), plain_table(), [1, 1]);
+    }
 
     Ok(0)
 }

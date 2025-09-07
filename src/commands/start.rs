@@ -38,6 +38,7 @@ pub fn command() -> clap::Command {
                 .default_missing_value("300")
                 .value_parser(clap::value_parser!(i64)),
         )
+        .arg(crate::quiet_arg())
 }
 
 fn not_too_old_to_resume(entry: &TrackedEntry, max_age: i64) -> bool {
@@ -106,7 +107,9 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
         new
     };
 
-    print_table(entry.to_table(status), plain_table(), [1, 1]);
+    if !args.get_flag("quiet") {
+        print_table(entry.to_table(status), plain_table(), [1, 1]);
+    }
 
     Ok(0)
 }
