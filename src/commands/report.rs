@@ -53,7 +53,6 @@ fn is_same_date(a: &chrono::NaiveDateTime, b: &chrono::NaiveDateTime) -> bool {
 pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
     let since = to_naive_date_time(args.get_one::<String>("since"), None)?;
     let until = to_naive_date_time(args.get_one::<String>("until"), None)?;
-    let events = find_events(&since.date(), &until.date());
 
     let arg_group = args.get_one::<String>("group").expect("Default missing");
     let mut grouped_event = TimeEvent {
@@ -66,18 +65,15 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
     let mut total_events = 0;
     let mut total_duration = chrono::Duration::zero();
 
-    let mut events = events
-        .iter()
-        .filter(|e| e.matches_args(args))
-        .peekable();
-
+    let events = find_events(&since.date(), &until.date());
+    let mut events = events.iter().filter(|e| e.matches_args(args)).peekable();
     while let Some(event) = events.next() {
         let duration = event.duration();
         total_duration += duration;
         total_events += 1;
 
-        let same_date_tomorrow = if let Some(next_event) = events.peek() {
-            is_same_date(&event.start, &next_event.start)
+        let same_event_tomorrow = if let Some(next_event) = events.peek() {
+            is_same_date(&event.start, &next_event.start) && event.project == next_event.project
         } else {
             false
         };
@@ -93,13 +89,15 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
                     stop: event.stop,
                     tags: event.tags.clone(),
                 };
-            } else if is_same_date(&grouped_event.start, &event.start) {
+            } else if is_same_date(&grouped_event.start, &event.start)
+                && grouped_event.project == event.project
+            {
                 grouped_event.tags.extend(event.tags.clone());
                 grouped_event.total_duration =
                     Some(grouped_event.total_duration.unwrap() + duration);
             }
 
-            if same_date_tomorrow {
+            if same_event_tomorrow {
                 continue;
             }
 
@@ -123,7 +121,7 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
             Cell::new(&event.tags_as_string()),
         ]));
 
-        if !same_date_tomorrow {
+        if !same_event_tomorrow {
             grouped_event.total_duration = None;
         }
     }
