@@ -36,7 +36,7 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
         } else {
             last.stop = Some(to_naive_date_time(
                 args.get_one::<String>("stop_time"),
-                None,
+                Some(&last.start),
             )?);
 
             if last.duration().num_seconds() < min_duration()? {
