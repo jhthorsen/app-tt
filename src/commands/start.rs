@@ -1,6 +1,6 @@
 use crate::event::{TimeEvent, find_last_event};
 use crate::styling::{plain_table, print_table};
-use crate::utils::{min_duration, to_naive_date_time};
+use crate::utils::{default_project, min_duration, to_naive_date_time};
 use clap::{Arg, Command};
 
 pub fn command() -> clap::Command {
@@ -34,16 +34,6 @@ pub fn command() -> clap::Command {
                 .value_parser(clap::value_parser!(i64)),
         )
         .arg(crate::quiet_arg())
-}
-
-fn default_project() -> String {
-    if let Ok(from_cwd) = std::env::current_dir()
-        && let Some(name) = from_cwd.file_name()
-    {
-        return name.to_string_lossy().to_string();
-    }
-
-    "default".to_string()
 }
 
 fn not_too_old_to_resume(event: &TimeEvent, max_age: i64) -> bool {

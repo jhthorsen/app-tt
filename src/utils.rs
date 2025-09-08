@@ -1,5 +1,15 @@
 use anyhow::anyhow;
 
+pub fn default_project() -> String {
+    if let Ok(from_cwd) = std::env::current_dir()
+        && let Some(name) = from_cwd.file_name()
+    {
+        return name.to_string_lossy().to_string();
+    }
+
+    "default".to_string()
+}
+
 pub fn format_date(d: &chrono::NaiveDateTime, format: &'static str) -> String {
     match format {
         "full" => d.format("%Y-%m-%d %H:%M").to_string(),
