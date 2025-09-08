@@ -28,6 +28,8 @@ $ tt stop 17:00
 
 At any time, you can inspect all previous events using the [`report`](#report) sub command or the current event with [`status`](#status). The [`register`](#register) and [`edit`](#edit) commands can be used to add missed events or change existing logged events.
 
+See also "[Track events automatically](#track-events-automatically)".
+
 ## Installation
 
 You need to install [`cargo`](https://rustup.rs) somehow. After that, you can build and install "tt" with the following command:
@@ -137,6 +139,21 @@ $ tt register 2020-01-01T09:00:00 17:00:00 \
 ```bash
 EDITOR=vim
 TT_MIN_DURATION=300
+```
+
+## Track events automatically
+
+`tt` can support automatically tracking of events, by either adding it to `$PS1` or inside a wrapper function in ex. `bash`. Here is one example:
+
+```bash
+vi() {
+  # Start or resume an event before editing files
+  [ -d ".git" ] && tt start --quiet --resume;
+  # Start the editor
+  ${EDITOR:-nvim} "$@";
+  # Stop or add a tag after editing
+  [ -d ".git" ] && tt stop --quiet --tag-unless-same-project;
+}
 ```
 
 ## History
