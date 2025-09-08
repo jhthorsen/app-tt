@@ -49,7 +49,7 @@ Each command can take `-h`, `--help` for more details, and most switches have a 
 
 ### start
 
-This command will start tracking a new event. It will also stop the current event if any event is in process. There is also a `--resume` switch which can resume the last logged event.
+This command will start tracking a new event or update an active event. It will also stop the current event if a new event is started. There is also a `--resume` switch which can resume the last logged event.
 
 * The time will default to "now".
 * `--project` will default to current working directory.
@@ -71,10 +71,12 @@ This command will stop tracking the current event.
 
 * The time will default to "now".
 * `--quiet` will avoid printing the event to screen.
+* `--tag-unless-same-project` will add a tag, unless same project as last event
 
 ```bash
-$ tt stop       # Stop event at "now"
-$ tt stop 16:00 # Stop event at 16:00
+$ tt stop                           # Stop event at "now"
+$ tt stop 16:00                     # Stop event at 16:00
+$ tt stop --tag-unless-same-project # Maybe tag, instead of stopping the event
 ```
 
 ### status

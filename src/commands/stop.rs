@@ -30,11 +30,8 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
         if let Some(project) = args.get_one::<String>("project")
             && last.project != *project
         {
-            if !last.tags.contains(project) {
-                status = "Tag added";
-                last.tags.push(project.clone());
-                last.save()?;
-            }
+            status = "Added tag";
+            last.add_tags(vec![project]);
         } else {
             last.stop = Some(to_naive_date_time(
                 args.get_one::<String>("stop_time"),

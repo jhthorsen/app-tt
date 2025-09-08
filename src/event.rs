@@ -54,6 +54,14 @@ impl From<FileEvent> for TimeEvent {
 }
 
 impl TimeEvent {
+    pub fn add_tags<T: ToString>(&mut self, tags: Vec<T>) {
+        self.tags.extend(tags.into_iter().map(|t| t.to_string()));
+        self.tags = std::collections::HashSet::<&String>::from_iter(self.tags.iter())
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<String>>();
+    }
+
     pub fn delete(&self) -> Result<(), anyhow::Error> {
         Ok(std::fs::remove_file(self.path())?)
     }

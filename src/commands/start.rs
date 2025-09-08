@@ -50,12 +50,6 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
     let start = to_naive_date_time(args.get_one::<String>("start_time"), None)?;
     let mut last = find_last_event().unwrap_or_default();
 
-    let tags = if let Some(tag) = args.get_one::<String>("tag") {
-        tag.split(',').map(|s| s.trim().to_string()).collect()
-    } else {
-        vec![]
-    };
-
     let mut status = "Started";
     let resume = args.get_one::<i64>("resume");
     let project = args
@@ -63,15 +57,13 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
         .unwrap_or(&default_project())
         .to_owned();
 
-    let event = if let Some(max_age) = resume
+    let mut event = if let Some(max_age) = resume
         && last.project == project
         && last.stop.is_some()
         && not_too_old_to_resume(&last, *max_age)
     {
         status = "Resumed";
         last.stop = None;
-        last.tags.extend(tags);
-        last.save()?;
         last
     } else if !last.project.is_empty() && last.stop.is_none() {
         status = "Tracking";
@@ -87,20 +79,25 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
             }
         }
 
-        let new = TimeEvent {
-            description: args
-                .get_one::<String>("description")
-                .cloned()
-                .unwrap_or_default(),
+        TimeEvent {
+            description: "".to_string(),
             project,
             start,
             stop: None,
-            tags,
+            tags: vec![],
             total_duration: None,
-        };
-        new.save()?;
-        new
+        }
     };
+
+    if let Some(description) = args.get_one::<String>("description") {
+        event.description = description.clone();
+    }
+
+    if let Some(tag) = args.get_one::<String>("tag") {
+        event.add_tags(tag.split(',').map(|s| s.trim().to_string()).collect());
+    }
+
+    event.save()?;
 
     if !args.get_flag("quiet") {
         print_table(event.to_table(status), plain_table(), [1, 1]);
