@@ -32,6 +32,7 @@ pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
         {
             status = "Added tag";
             last.add_tags(vec![project]);
+            last.save()?;
         } else {
             last.stop = Some(to_naive_date_time(
                 args.get_one::<String>("stop_time"),
