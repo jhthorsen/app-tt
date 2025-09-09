@@ -1,6 +1,8 @@
 use crate::event::find_last_event;
 use crate::styling::{plain_table, print_table};
+use crate::utils::format_date;
 use clap::Command;
+use prettytable::row;
 
 pub fn command() -> Command {
     Command::new("status").about("Show the current time tracking status (default)")
@@ -14,7 +16,16 @@ pub fn run(_args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
         "Tracking"
     };
 
-    print_table(last.to_table(status), plain_table(), [1, 1]);
+    let mut t = last.to_table(status);
+    t.insert_row(
+        3,
+        row![
+            "Now",
+            format_date(&chrono::Local::now().naive_local(), "full")
+        ],
+    );
+
+    print_table(t, plain_table(), [1, 1]);
 
     Ok(0)
 }
