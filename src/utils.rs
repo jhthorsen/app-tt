@@ -43,11 +43,6 @@ pub fn to_naive_date_time(
         return Ok(now);
     };
 
-    // Special case
-    if human_date.trim().to_lowercase() == "now" {
-        return Ok(now);
-    }
-
     let mut parts: Vec<String> = human_date
         .trim()
         .replace(" ", "T")

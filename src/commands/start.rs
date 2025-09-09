@@ -1,15 +1,17 @@
 use crate::event::{TimeEvent, find_last_event};
 use crate::styling::{plain_table, print_table};
-use crate::utils::{default_project, min_duration, to_naive_date_time};
+use crate::utils::{default_project, format_date, min_duration, to_naive_date_time};
 use clap::{Arg, Command};
 
 pub fn command() -> clap::Command {
+    let now = chrono::Local::now().naive_local();
+
     Command::new("start")
         .about("Start tracking time")
         .arg(
             Arg::new("start_time")
                 .help("The start time for tracking (e.g., '08:00')")
-                .default_value("now")
+                .default_value(format_date(&now, "hm"))
                 .index(1),
         )
         .arg(

@@ -33,7 +33,7 @@ pub fn command() -> Command {
             Arg::new("until")
                 .help("Until what time")
                 .long("until")
-                .default_value("now"),
+                .default_value(format_date(&now.naive_local(), "hm")),
         )
         .arg(
             Arg::new("group")
