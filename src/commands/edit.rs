@@ -6,7 +6,8 @@ use tempfile::NamedTempFile;
 
 pub fn command() -> Command {
     let last = find_last_event().unwrap_or_default();
-    let example_time = last.start.format("%Y-%m-%dT%H:%M:%S");
+    let example_since = last.start.format("%Y-%m-%dT00:00:00");
+    let example_until = last.start.format("%Y-%m-%dT23:59:59");
 
     Command::new("edit")
         .about("Edit event(s)")
@@ -14,12 +15,13 @@ pub fn command() -> Command {
             Arg::new("since")
                 .help("From what start time for event(s) to edit")
                 .long("since")
-                .default_value(example_time.to_string()),
+                .default_value(example_since.to_string()),
         )
         .arg(
             Arg::new("until")
                 .help("Until what start time for event(s) to edit")
-                .long("until"),
+                .long("until")
+                .default_value(example_until.to_string()),
         )
         .arg(
             Arg::new("dry_run")
@@ -32,7 +34,7 @@ pub fn command() -> Command {
 
 pub fn run(args: &clap::ArgMatches) -> Result<i32, anyhow::Error> {
     let since = to_naive_date_time(args.get_one::<String>("since"), None)?;
-    let until = to_naive_date_time(args.get_one::<String>("until"), Some(&since))?;
+    let until = to_naive_date_time(args.get_one::<String>("until"), None)?;
     let editor = std::env::var("EDITOR").unwrap_or_else(|_| "vi".to_string());
 
     for event in find_events(&since.date(), &until.date()) {
